@@ -29,8 +29,6 @@ addons:
 script:
   - cargo build --verbose --all
   - cargo test --verbose --all
-  - cargo run --example example_ring
-  - cargo run --example example_client
 
 after_success:
   - |
