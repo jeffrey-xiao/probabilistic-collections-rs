@@ -1,7 +1,9 @@
 use bit_vec::BitVec;
 use rand::{Rng, XorShiftRng};
 use siphasher::sip::SipHasher;
+use std::borrow::Borrow;
 use std::hash::{Hash, Hasher};
+use std::marker::PhantomData;
 
 /// A space-efficient probabilistic data structure to test for membership in a set.
 ///
@@ -14,27 +16,28 @@ use std::hash::{Hash, Hasher};
 /// ```
 /// use probabilistic_collections::bloom::PartitionedBloomFilter;
 ///
-/// let mut filter = PartitionedBloomFilter::from_item_count(10, 0.01);
+/// let mut filter = PartitionedBloomFilter::<String>::from_item_count(10, 0.01);
 ///
-/// assert!(!filter.contains(&"foo"));
-/// filter.insert(&"foo");
-/// assert!(filter.contains(&"foo"));
+/// assert!(!filter.contains("foo"));
+/// filter.insert("foo");
+/// assert!(filter.contains("foo"));
 ///
 /// filter.clear();
-/// assert!(!filter.contains(&"foo"));
+/// assert!(!filter.contains("foo"));
 ///
 /// assert_eq!(filter.len(), 98);
 /// assert_eq!(filter.bit_count(), 14);
 /// assert_eq!(filter.hasher_count(), 7);
 /// ```
-pub struct PartitionedBloomFilter {
+pub struct PartitionedBloomFilter<T> {
     bit_vec: BitVec,
     hashers: [SipHasher; 2],
     bit_count: usize,
     hasher_count: usize,
+    _marker: PhantomData<T>,
 }
 
-impl PartitionedBloomFilter {
+impl<T> PartitionedBloomFilter<T> {
     fn get_hashers() -> [SipHasher; 2] {
         let mut rng = XorShiftRng::new_unseeded();
         [
@@ -54,7 +57,7 @@ impl PartitionedBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::PartitionedBloomFilter;
     ///
-    /// let filter = PartitionedBloomFilter::from_item_count(10, 0.01);
+    /// let filter = PartitionedBloomFilter::<String>::from_item_count(10, 0.01);
     /// ```
     pub fn from_item_count(item_count: usize, fpp: f64) -> Self {
         let hasher_count = Self::get_hasher_count(fpp);
@@ -64,6 +67,7 @@ impl PartitionedBloomFilter {
             hashers: Self::get_hashers(),
             bit_count,
             hasher_count,
+            _marker: PhantomData,
         }
     }
 
@@ -74,7 +78,7 @@ impl PartitionedBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::PartitionedBloomFilter;
     ///
-    /// let filter = PartitionedBloomFilter::from_bit_count(10, 0.01);
+    /// let filter = PartitionedBloomFilter::<String>::from_bit_count(10, 0.01);
     /// ```
     pub fn from_bit_count(bit_count: usize, fpp: f64) -> Self {
         let hasher_count = Self::get_hasher_count(fpp);
@@ -83,12 +87,14 @@ impl PartitionedBloomFilter {
             hashers: Self::get_hashers(),
             bit_count,
             hasher_count,
+            _marker: PhantomData,
         }
     }
 
-    fn get_hashes<T>(&self, item: &T) -> [u64; 2]
+    fn get_hashes<U>(&self, item: &U) -> [u64; 2]
     where
-        T: Hash,
+        T: Borrow<U>,
+        U: Hash + ?Sized,
     {
         let mut ret = [0; 2];
         for (index, hash) in ret.iter_mut().enumerate() {
@@ -105,13 +111,14 @@ impl PartitionedBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::PartitionedBloomFilter;
     ///
-    /// let mut filter = PartitionedBloomFilter::from_item_count(10, 0.01);
+    /// let mut filter = PartitionedBloomFilter::<String>::from_item_count(10, 0.01);
     ///
-    /// filter.insert(&"foo");
+    /// filter.insert("foo");
     /// ```
-    pub fn insert<T>(&mut self, item: &T)
+    pub fn insert<U>(&mut self, item: &U)
     where
-        T: Hash,
+        T: Borrow<U>,
+        U: Hash + ?Sized,
     {
         let hashes = self.get_hashes(item);
         for index in 0..self.hasher_count {
@@ -129,15 +136,16 @@ impl PartitionedBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::PartitionedBloomFilter;
     ///
-    /// let mut filter = PartitionedBloomFilter::from_item_count(10, 0.01);
+    /// let mut filter = PartitionedBloomFilter::<String>::from_item_count(10, 0.01);
     ///
-    /// assert!(!filter.contains(&"foo"));
-    /// filter.insert(&"foo");
-    /// assert!(filter.contains(&"foo"));
+    /// assert!(!filter.contains("foo"));
+    /// filter.insert("foo");
+    /// assert!(filter.contains("foo"));
     /// ```
-    pub fn contains<T>(&self, item: &T) -> bool
+    pub fn contains<U>(&self, item: &U) -> bool
     where
-        T: Hash,
+        T: Borrow<U>,
+        U: Hash + ?Sized,
     {
         let hashes = self.get_hashes(item);
         (0..self.hasher_count).all(|index| {
@@ -155,7 +163,7 @@ impl PartitionedBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::PartitionedBloomFilter;
     ///
-    /// let filter = PartitionedBloomFilter::from_item_count(10, 0.01);
+    /// let filter = PartitionedBloomFilter::<String>::from_item_count(10, 0.01);
     ///
     /// assert_eq!(filter.len(), 98);
     /// ```
@@ -169,7 +177,7 @@ impl PartitionedBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::PartitionedBloomFilter;
     ///
-    /// let filter = PartitionedBloomFilter::from_item_count(10, 0.01);
+    /// let filter = PartitionedBloomFilter::<String>::from_item_count(10, 0.01);
     ///
     /// assert!(!filter.is_empty());
     /// ```
@@ -183,7 +191,7 @@ impl PartitionedBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::PartitionedBloomFilter;
     ///
-    /// let filter = PartitionedBloomFilter::from_item_count(10, 0.01);
+    /// let filter = PartitionedBloomFilter::<String>::from_item_count(10, 0.01);
     ///
     /// assert_eq!(filter.bit_count(), 14);
     /// ```
@@ -197,7 +205,7 @@ impl PartitionedBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::PartitionedBloomFilter;
     ///
-    /// let filter = PartitionedBloomFilter::from_item_count(10, 0.01);
+    /// let filter = PartitionedBloomFilter::<String>::from_item_count(10, 0.01);
     ///
     /// assert_eq!(filter.hasher_count(), 7);
     /// ```
@@ -211,12 +219,12 @@ impl PartitionedBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::PartitionedBloomFilter;
     ///
-    /// let mut filter = PartitionedBloomFilter::from_item_count(10, 0.01);
+    /// let mut filter = PartitionedBloomFilter::<String>::from_item_count(10, 0.01);
     ///
-    /// filter.insert(&"foo");
+    /// filter.insert("foo");
     /// filter.clear();
     ///
-    /// assert!(!filter.contains(&"foo"));
+    /// assert!(!filter.contains("foo"));
     /// ```
     pub fn clear(&mut self) {
         self.bit_vec.set_all(false)
@@ -228,8 +236,8 @@ impl PartitionedBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::PartitionedBloomFilter;
     ///
-    /// let mut filter = PartitionedBloomFilter::from_item_count(10, 0.01);
-    /// filter.insert(&"foo");
+    /// let mut filter = PartitionedBloomFilter::<String>::from_item_count(10, 0.01);
+    /// filter.insert("foo");
     ///
     /// assert_eq!(filter.count_ones(), 7);
     /// ```
@@ -243,8 +251,8 @@ impl PartitionedBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::PartitionedBloomFilter;
     ///
-    /// let mut filter = PartitionedBloomFilter::from_item_count(10, 0.01);
-    /// filter.insert(&"foo");
+    /// let mut filter = PartitionedBloomFilter::<String>::from_item_count(10, 0.01);
+    /// filter.insert("foo");
     ///
     /// assert_eq!(filter.count_zeros(), 91);
     /// ```
@@ -262,10 +270,13 @@ impl PartitionedBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::PartitionedBloomFilter;
     ///
-    /// let mut filter = PartitionedBloomFilter::from_item_count(100, 0.01);
-    /// assert!(filter.estimate_fpp() < 1e-6);
+    /// let mut filter = PartitionedBloomFilter::<u32>::from_item_count(100, 0.01);
+    /// assert!(filter.estimate_fpp() < 1e-15);
+    /// println!("{}", filter.estimate_fpp());
     ///
     /// filter.insert(&0);
+    /// println!("{}", filter.estimate_fpp());
+    /// assert!(filter.estimate_fpp() > 1e-15);
     /// assert!(filter.estimate_fpp() < 0.01);
     /// ```
     pub fn estimate_fpp(&self) -> f64 {
@@ -280,16 +291,16 @@ mod tests {
 
     #[test]
     fn test_from_item_count() {
-        let mut filter = PartitionedBloomFilter::from_item_count(10, 0.01);
+        let mut filter = PartitionedBloomFilter::<String>::from_item_count(10, 0.01);
 
-        assert!(!filter.contains(&"foo"));
-        filter.insert(&"foo");
-        assert!(filter.contains(&"foo"));
+        assert!(!filter.contains("foo"));
+        filter.insert("foo");
+        assert!(filter.contains("foo"));
         assert_eq!(filter.count_ones(), 7);
         assert_eq!(filter.count_zeros(), 91);
 
         filter.clear();
-        assert!(!filter.contains(&"foo"));
+        assert!(!filter.contains("foo"));
 
         assert_eq!(filter.len(), 98);
         assert_eq!(filter.bit_count(), 14);
@@ -298,16 +309,16 @@ mod tests {
 
     #[test]
     fn test_from_bit_count() {
-        let mut filter = PartitionedBloomFilter::from_bit_count(10, 0.01);
+        let mut filter = PartitionedBloomFilter::<String>::from_bit_count(10, 0.01);
 
-        assert!(!filter.contains(&"foo"));
-        filter.insert(&"foo");
-        assert!(filter.contains(&"foo"));
+        assert!(!filter.contains("foo"));
+        filter.insert("foo");
+        assert!(filter.contains("foo"));
         assert_eq!(filter.count_ones(), 7);
         assert_eq!(filter.count_zeros(), 63);
 
         filter.clear();
-        assert!(!filter.contains(&"foo"));
+        assert!(!filter.contains("foo"));
 
         assert_eq!(filter.len(), 70);
         assert_eq!(filter.bit_count(), 10);
@@ -316,8 +327,8 @@ mod tests {
 
     #[test]
     fn test_estimate_fpp() {
-        let mut filter = PartitionedBloomFilter::from_item_count(100, 0.01);
-        assert!(filter.estimate_fpp() < 1e-6);
+        let mut filter = PartitionedBloomFilter::<u32>::from_item_count(100, 0.01);
+        assert!(filter.estimate_fpp() < 1e-15);
 
         filter.insert(&0);
 

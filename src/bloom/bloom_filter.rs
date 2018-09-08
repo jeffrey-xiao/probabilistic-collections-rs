@@ -3,8 +3,10 @@ use rand::{Rng, XorShiftRng};
 use serde::de::{self, Deserialize, Deserializer, MapAccess, SeqAccess, Visitor};
 use serde::ser::{Serialize, SerializeStruct, Serializer};
 use siphasher::sip::SipHasher;
+use std::borrow::Borrow;
 use std::fmt;
 use std::hash::{Hash, Hasher};
+use std::marker::PhantomData;
 
 /// A space-efficient probabilistic data structure to test for membership in a set.
 ///
@@ -19,26 +21,27 @@ use std::hash::{Hash, Hasher};
 /// ```
 /// use probabilistic_collections::bloom::BloomFilter;
 ///
-/// let mut filter = BloomFilter::new(10, 0.01);
+/// let mut filter = BloomFilter::<String>::new(10, 0.01);
 ///
-/// assert!(!filter.contains(&"foo"));
-/// filter.insert(&"foo");
-/// assert!(filter.contains(&"foo"));
+/// assert!(!filter.contains("foo"));
+/// filter.insert("foo");
+/// assert!(filter.contains("foo"));
 ///
 /// filter.clear();
-/// assert!(!filter.contains(&"foo"));
+/// assert!(!filter.contains("foo"));
 ///
 /// assert_eq!(filter.len(), 96);
 /// assert_eq!(filter.hasher_count(), 7);
 /// ```
 #[derive(Clone)]
-pub struct BloomFilter {
+pub struct BloomFilter<T> {
     bit_vec: BitVec,
     hashers: [SipHasher; 2],
     hasher_count: usize,
+    _marker: PhantomData<T>,
 }
 
-impl BloomFilter {
+impl<T> BloomFilter<T> {
     fn get_hashers() -> [SipHasher; 2] {
         let mut rng = XorShiftRng::new_unseeded();
         [
@@ -58,7 +61,7 @@ impl BloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::BloomFilter;
     ///
-    /// let filter = BloomFilter::new(10, 0.01);
+    /// let filter = BloomFilter::<String>::new(10, 0.01);
     /// ```
     pub fn new(item_count: usize, fpp: f64) -> Self {
         let bit_count = (-fpp.log2() * (item_count as f64) / 2f64.ln()).ceil() as usize;
@@ -66,6 +69,7 @@ impl BloomFilter {
             bit_vec: BitVec::new(bit_count),
             hashers: Self::get_hashers(),
             hasher_count: Self::get_hasher_count(bit_count, item_count),
+            _marker: PhantomData,
         }
     }
 
@@ -76,13 +80,14 @@ impl BloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::BloomFilter;
     ///
-    /// let filter = BloomFilter::from_item_count(100, 10);
+    /// let filter = BloomFilter::<String>::from_item_count(100, 10);
     /// ```
     pub fn from_item_count(bit_count: usize, item_count: usize) -> Self {
         BloomFilter {
             bit_vec: BitVec::new(bit_count),
             hashers: Self::get_hashers(),
             hasher_count: Self::get_hasher_count(bit_count, item_count),
+            _marker: PhantomData,
         }
     }
 
@@ -93,7 +98,7 @@ impl BloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::BloomFilter;
     ///
-    /// let filter = BloomFilter::from_fpp(100, 0.01);
+    /// let filter = BloomFilter::<String>::from_fpp(100, 0.01);
     /// ```
     pub fn from_fpp(bit_count: usize, fpp: f64) -> Self {
         let item_count = -(2f64.ln() * (bit_count as f64) / fpp.log2()).floor() as usize;
@@ -101,12 +106,14 @@ impl BloomFilter {
             bit_vec: BitVec::new(bit_count),
             hashers: Self::get_hashers(),
             hasher_count: Self::get_hasher_count(bit_count, item_count),
+            _marker: PhantomData,
         }
     }
 
-    fn get_hashes<T>(&self, item: &T) -> [u64; 2]
+    fn get_hashes<U>(&self, item: &U) -> [u64; 2]
     where
-        T: Hash,
+        T: Borrow<U>,
+        U: Hash + ?Sized,
     {
         let mut ret = [0; 2];
         for (index, hash) in ret.iter_mut().enumerate() {
@@ -123,13 +130,14 @@ impl BloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::BloomFilter;
     ///
-    /// let mut filter = BloomFilter::new(10, 0.01);
+    /// let mut filter = BloomFilter::<String>::new(10, 0.01);
     ///
-    /// filter.insert(&"foo");
+    /// filter.insert("foo");
     /// ```
-    pub fn insert<T>(&mut self, item: &T)
+    pub fn insert<U>(&mut self, item: &U)
     where
-        T: Hash,
+        T: Borrow<U>,
+        U: Hash + ?Sized,
     {
         let hashes = self.get_hashes(item);
         for index in 0..self.hasher_count {
@@ -146,15 +154,16 @@ impl BloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::BloomFilter;
     ///
-    /// let mut filter = BloomFilter::new(10, 0.01);
+    /// let mut filter = BloomFilter::<String>::new(10, 0.01);
     ///
-    /// assert!(!filter.contains(&"foo"));
-    /// filter.insert(&"foo");
-    /// assert!(filter.contains(&"foo"));
+    /// assert!(!filter.contains("foo"));
+    /// filter.insert("foo");
+    /// assert!(filter.contains("foo"));
     /// ```
-    pub fn contains<T>(&self, item: &T) -> bool
+    pub fn contains<U>(&self, item: &U) -> bool
     where
-        T: Hash,
+        T: Borrow<U>,
+        U: Hash + ?Sized,
     {
         let hashes = self.get_hashes(item);
         (0..self.hasher_count).all(|index| {
@@ -171,7 +180,7 @@ impl BloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::BloomFilter;
     ///
-    /// let filter = BloomFilter::from_fpp(100, 0.01);
+    /// let filter = BloomFilter::<String>::from_fpp(100, 0.01);
     ///
     /// assert_eq!(filter.len(), 100);
     /// ```
@@ -185,7 +194,7 @@ impl BloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::BloomFilter;
     ///
-    /// let filter = BloomFilter::from_fpp(100, 0.01);
+    /// let filter = BloomFilter::<String>::from_fpp(100, 0.01);
     ///
     /// assert!(!filter.is_empty());
     /// ```
@@ -199,7 +208,7 @@ impl BloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::BloomFilter;
     ///
-    /// let filter = BloomFilter::new(10, 0.01);
+    /// let filter = BloomFilter::<String>::new(10, 0.01);
     ///
     /// assert_eq!(filter.hasher_count(), 7);
     /// ```
@@ -213,12 +222,12 @@ impl BloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::BloomFilter;
     ///
-    /// let mut filter = BloomFilter::new(10, 0.01);
+    /// let mut filter = BloomFilter::<String>::new(10, 0.01);
     ///
-    /// filter.insert(&"foo");
+    /// filter.insert("foo");
     /// filter.clear();
     ///
-    /// assert!(!filter.contains(&"foo"));
+    /// assert!(!filter.contains("foo"));
     /// ```
     pub fn clear(&mut self) {
         self.bit_vec.set_all(false)
@@ -230,8 +239,8 @@ impl BloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::BloomFilter;
     ///
-    /// let mut filter = BloomFilter::from_fpp(100, 0.01);
-    /// filter.insert(&"foo");
+    /// let mut filter = BloomFilter::<String>::from_fpp(100, 0.01);
+    /// filter.insert("foo");
     ///
     /// assert_eq!(filter.count_ones(), 7);
     /// ```
@@ -245,8 +254,8 @@ impl BloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::BloomFilter;
     ///
-    /// let mut filter = BloomFilter::from_fpp(100, 0.01);
-    /// filter.insert(&"foo");
+    /// let mut filter = BloomFilter::<String>::from_fpp(100, 0.01);
+    /// filter.insert("foo");
     ///
     /// assert_eq!(filter.count_zeros(), 93);
     /// ```
@@ -261,10 +270,11 @@ impl BloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::BloomFilter;
     ///
-    /// let mut filter = BloomFilter::new(100, 0.01);
-    /// assert!(filter.estimate_fpp() < 1e-6);
+    /// let mut filter = BloomFilter::<u32>::new(100, 0.01);
+    /// assert!(filter.estimate_fpp() < 1e-15);
     ///
     /// filter.insert(&0);
+    /// assert!(filter.estimate_fpp() > 1e-15);
     /// assert!(filter.estimate_fpp() < 0.01);
     /// ```
     pub fn estimate_fpp(&self) -> f64 {
@@ -273,8 +283,8 @@ impl BloomFilter {
     }
 }
 
-impl PartialEq for BloomFilter {
-    fn eq(&self, other: &BloomFilter) -> bool {
+impl<T> PartialEq for BloomFilter<T> {
+    fn eq(&self, other: &BloomFilter<T>) -> bool {
         self.hasher_count == other.hasher_count
             && self.hashers[0].keys() == other.hashers[0].keys()
             && self.hashers[1].keys() == other.hashers[1].keys()
@@ -282,7 +292,7 @@ impl PartialEq for BloomFilter {
     }
 }
 
-impl Serialize for BloomFilter {
+impl<T> Serialize for BloomFilter<T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -296,7 +306,7 @@ impl Serialize for BloomFilter {
     }
 }
 
-impl<'de> Deserialize<'de> for BloomFilter {
+impl<'de, T> Deserialize<'de> for BloomFilter<T> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -335,10 +345,10 @@ impl<'de> Deserialize<'de> for BloomFilter {
             }
         }
 
-        struct BloomFilterVisitor;
+        struct BloomFilterVisitor<T>(PhantomData<T>);
 
-        impl<'de> Visitor<'de> for BloomFilterVisitor {
-            type Value = BloomFilter;
+        impl<'de, T> Visitor<'de> for BloomFilterVisitor<T> {
+            type Value = BloomFilter<T>;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 formatter.write_str("struct BloomFilter")
@@ -363,6 +373,7 @@ impl<'de> Deserialize<'de> for BloomFilter {
                         SipHasher::new_with_keys(keys_1.0, keys_1.1),
                     ],
                     bit_vec,
+                    _marker: PhantomData,
                 })
             }
 
@@ -413,11 +424,12 @@ impl<'de> Deserialize<'de> for BloomFilter {
                         SipHasher::new_with_keys(keys_1.0, keys_1.1),
                     ],
                     bit_vec,
+                    _marker: PhantomData,
                 })
             }
         }
         const FIELDS: &[&str] = &["hasher_count", "keys_0", "keys_1", "bit_vec"];
-        deserializer.deserialize_struct("BloomFilter", FIELDS, BloomFilterVisitor)
+        deserializer.deserialize_struct("BloomFilter", FIELDS, BloomFilterVisitor(PhantomData))
     }
 }
 
@@ -428,16 +440,16 @@ mod tests {
 
     #[test]
     fn test_new() {
-        let mut filter = BloomFilter::new(10, 0.01);
+        let mut filter = BloomFilter::<String>::new(10, 0.01);
 
-        assert!(!filter.contains(&"foo"));
-        filter.insert(&"foo");
-        assert!(filter.contains(&"foo"));
+        assert!(!filter.contains("foo"));
+        filter.insert("foo");
+        assert!(filter.contains("foo"));
         assert_eq!(filter.count_ones(), 7);
         assert_eq!(filter.count_zeros(), 89);
 
         filter.clear();
-        assert!(!filter.contains(&"foo"));
+        assert!(!filter.contains("foo"));
 
         assert_eq!(filter.len(), 96);
         assert_eq!(filter.hasher_count(), 7);
@@ -445,16 +457,16 @@ mod tests {
 
     #[test]
     fn test_from_fpp() {
-        let mut filter = BloomFilter::from_fpp(100, 0.01);
+        let mut filter = BloomFilter::<String>::from_fpp(100, 0.01);
 
-        assert!(!filter.contains(&"foo"));
-        filter.insert(&"foo");
-        assert!(filter.contains(&"foo"));
+        assert!(!filter.contains("foo"));
+        filter.insert("foo");
+        assert!(filter.contains("foo"));
         assert_eq!(filter.count_ones(), 7);
         assert_eq!(filter.count_zeros(), 93);
 
         filter.clear();
-        assert!(!filter.contains(&"foo"));
+        assert!(!filter.contains("foo"));
 
         assert_eq!(filter.len(), 100);
         assert_eq!(filter.hasher_count(), 7);
@@ -462,16 +474,16 @@ mod tests {
 
     #[test]
     fn test_from_item_count() {
-        let mut filter = BloomFilter::from_item_count(100, 10);
+        let mut filter = BloomFilter::<String>::from_item_count(100, 10);
 
-        assert!(!filter.contains(&"foo"));
-        filter.insert(&"foo");
-        assert!(filter.contains(&"foo"));
+        assert!(!filter.contains("foo"));
+        filter.insert("foo");
+        assert!(filter.contains("foo"));
         assert_eq!(filter.count_ones(), 7);
         assert_eq!(filter.count_zeros(), 93);
 
         filter.clear();
-        assert!(!filter.contains(&"foo"));
+        assert!(!filter.contains("foo"));
 
         assert_eq!(filter.len(), 100);
         assert_eq!(filter.hasher_count(), 7);
@@ -479,8 +491,8 @@ mod tests {
 
     #[test]
     fn test_estimate_fpp() {
-        let mut filter = BloomFilter::new(100, 0.01);
-        assert!(filter.estimate_fpp() < 1e-6);
+        let mut filter = BloomFilter::<u32>::new(100, 0.01);
+        assert!(filter.estimate_fpp() < 1e-15);
 
         filter.insert(&0);
 
@@ -490,8 +502,8 @@ mod tests {
 
     #[test]
     fn test_ser_de() {
-        let mut filter = BloomFilter::new(100, 0.01);
-        filter.insert(&"foo");
+        let mut filter = BloomFilter::<String>::new(100, 0.01);
+        filter.insert("foo");
 
         let keys_0 = filter.hashers[0].keys();
         let keys_1 = filter.hashers[1].keys();
@@ -499,7 +511,7 @@ mod tests {
         let serialized_filter = serialize(&filter).unwrap();
         filter = deserialize(&serialized_filter).unwrap();
 
-        assert!(filter.contains(&"foo"));
+        assert!(filter.contains("foo"));
         assert_eq!(filter.hasher_count, 7);
         assert_eq!(filter.hashers[0].keys(), keys_0);
         assert_eq!(filter.hashers[1].keys(), keys_1);

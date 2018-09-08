@@ -2,8 +2,10 @@ use bit_array_vec::BitArrayVec;
 use cuckoo::{DEFAULT_ENTRIES_PER_INDEX, DEFAULT_FINGERPRINT_BIT_COUNT, DEFAULT_MAX_KICKS};
 use rand::{Rng, XorShiftRng};
 use siphasher::sip::SipHasher;
+use std::borrow::Borrow;
 use std::cmp;
 use std::hash::{Hash, Hasher};
+use std::marker::PhantomData;
 
 /// A space-efficient probabilistic data structure to test for membership in a set. Cuckoo filters
 /// also provide the flexibility to remove items.
@@ -16,29 +18,30 @@ use std::hash::{Hash, Hasher};
 /// ```
 /// use probabilistic_collections::cuckoo::CuckooFilter;
 ///
-/// let mut filter = CuckooFilter::new(100);
+/// let mut filter = CuckooFilter::<String>::new(100);
 ///
-/// assert!(!filter.contains(&"foo"));
-/// filter.insert(&"foo");
-/// assert!(filter.contains(&"foo"));
+/// assert!(!filter.contains("foo"));
+/// filter.insert("foo");
+/// assert!(filter.contains("foo"));
 ///
-/// filter.remove(&"foo");
-/// assert!(!filter.contains(&"foo"));
+/// filter.remove("foo");
+/// assert!(!filter.contains("foo"));
 ///
 /// assert_eq!(filter.len(), 0);
 /// assert_eq!(filter.capacity(), 128);
 /// assert_eq!(filter.bucket_len(), 32);
 /// assert_eq!(filter.fingerprint_bit_count(), 8);
 /// ```
-pub struct CuckooFilter {
+pub struct CuckooFilter<T> {
     max_kicks: usize,
     entries_per_index: usize,
     fingerprint_vec: BitArrayVec,
     pub(super) extra_items: Vec<(u64, usize)>,
     hashers: [SipHasher; 2],
+    _marker: PhantomData<T>,
 }
 
-impl CuckooFilter {
+impl<T> CuckooFilter<T> {
     fn get_hashers() -> [SipHasher; 2] {
         let mut rng = XorShiftRng::new_unseeded();
         [
@@ -61,7 +64,7 @@ impl CuckooFilter {
     /// ```
     /// use probabilistic_collections::cuckoo::CuckooFilter;
     ///
-    /// let filter = CuckooFilter::new(100);
+    /// let filter = CuckooFilter::<String>::new(100);
     /// ```
     pub fn new(item_count: usize) -> Self {
         assert!(item_count > 0);
@@ -75,6 +78,7 @@ impl CuckooFilter {
             ),
             extra_items: Vec::new(),
             hashers: Self::get_hashers(),
+            _marker: PhantomData,
         }
     }
 
@@ -93,7 +97,7 @@ impl CuckooFilter {
     /// ```
     /// use probabilistic_collections::cuckoo::CuckooFilter;
     ///
-    /// let filter = CuckooFilter::from_parameters(100, 16, 8);
+    /// let filter = CuckooFilter::<String>::from_parameters(100, 16, 8);
     /// ```
     pub fn from_parameters(
         item_count: usize,
@@ -116,6 +120,7 @@ impl CuckooFilter {
             ),
             extra_items: Vec::new(),
             hashers: Self::get_hashers(),
+            _marker: PhantomData,
         }
     }
 
@@ -132,7 +137,7 @@ impl CuckooFilter {
     /// ```
     /// use probabilistic_collections::cuckoo::CuckooFilter;
     ///
-    /// let filter = CuckooFilter::from_entries_per_index(100, 0.01, 4);
+    /// let filter = CuckooFilter::<String>::from_entries_per_index(100, 0.01, 4);
     /// ```
     pub fn from_entries_per_index(item_count: usize, fpp: f64, entries_per_index: usize) -> Self {
         assert!(item_count > 0 && entries_per_index > 0);
@@ -148,6 +153,7 @@ impl CuckooFilter {
             ),
             extra_items: Vec::new(),
             hashers: Self::get_hashers(),
+            _marker: PhantomData,
         }
     }
 
@@ -166,7 +172,7 @@ impl CuckooFilter {
     /// ```
     /// use probabilistic_collections::cuckoo::CuckooFilter;
     ///
-    /// let filter = CuckooFilter::from_fingerprint_bit_count(100, 0.01, 10);
+    /// let filter = CuckooFilter::<String>::from_fingerprint_bit_count(100, 0.01, 10);
     /// ```
     pub fn from_fingerprint_bit_count(
         item_count: usize,
@@ -188,12 +194,14 @@ impl CuckooFilter {
             ),
             extra_items: Vec::new(),
             hashers: Self::get_hashers(),
+            _marker: PhantomData,
         }
     }
 
-    fn get_hashes<T>(&self, item: &T) -> [u64; 2]
+    fn get_hashes<U>(&self, item: &U) -> [u64; 2]
     where
-        T: Hash,
+        T: Borrow<U>,
+        U: Hash + ?Sized,
     {
         let mut ret = [0; 2];
         for (index, hash) in ret.iter_mut().enumerate() {
@@ -248,12 +256,13 @@ impl CuckooFilter {
     /// ```
     /// use probabilistic_collections::cuckoo::CuckooFilter;
     ///
-    /// let mut filter = CuckooFilter::new(100);
-    /// filter.insert(&"foo");
+    /// let mut filter = CuckooFilter::<String>::new(100);
+    /// filter.insert("foo");
     /// ```
-    pub fn insert<T>(&mut self, item: &T)
+    pub fn insert<U>(&mut self, item: &U)
     where
-        T: Hash,
+        T: Borrow<U>,
+        U: Hash + ?Sized,
     {
         let hashes = self.get_hashes(item);
         let (mut fingerprint, index_1, index_2) = self.get_fingerprint_and_indexes(hashes);
@@ -309,17 +318,18 @@ impl CuckooFilter {
     /// ```
     /// use probabilistic_collections::cuckoo::CuckooFilter;
     ///
-    /// let mut filter = CuckooFilter::new(100);
+    /// let mut filter = CuckooFilter::<String>::new(100);
     ///
-    /// filter.insert(&"foo");
-    /// assert!(filter.contains(&"foo"));
+    /// filter.insert("foo");
+    /// assert!(filter.contains("foo"));
     ///
-    /// filter.remove(&"foo");
-    /// assert!(!filter.contains(&"foo"));
+    /// filter.remove("foo");
+    /// assert!(!filter.contains("foo"));
     /// ```
-    pub fn remove<T>(&mut self, item: &T)
+    pub fn remove<U>(&mut self, item: &U)
     where
-        T: Hash,
+        T: Borrow<U>,
+        U: Hash + ?Sized,
     {
         let hashes = self.get_hashes(item);
         let (fingerprint, index_1, index_2) = self.get_fingerprint_and_indexes(hashes);
@@ -351,14 +361,15 @@ impl CuckooFilter {
     /// ```
     /// use probabilistic_collections::cuckoo::CuckooFilter;
     ///
-    /// let mut filter = CuckooFilter::new(100);
+    /// let mut filter = CuckooFilter::<String>::new(100);
     ///
-    /// filter.insert(&"foo");
-    /// assert!(filter.contains(&"foo"));
+    /// filter.insert("foo");
+    /// assert!(filter.contains("foo"));
     /// ```
-    pub fn contains<T>(&self, item: &T) -> bool
+    pub fn contains<U>(&self, item: &U) -> bool
     where
-        T: Hash,
+        T: Borrow<U>,
+        U: Hash + ?Sized,
     {
         let (fingerprint, index_1, index_2) = self.get_fingerprint_and_indexes(self.get_hashes(item));
         self.contains_fingerprint(&fingerprint, index_1, index_2)
@@ -385,12 +396,12 @@ impl CuckooFilter {
     /// ```
     /// use probabilistic_collections::cuckoo::CuckooFilter;
     ///
-    /// let mut filter = CuckooFilter::new(100);
+    /// let mut filter = CuckooFilter::<String>::new(100);
     ///
-    /// filter.insert(&"foo");
+    /// filter.insert("foo");
     /// filter.clear();
     ///
-    /// assert!(!filter.contains(&"foo"));
+    /// assert!(!filter.contains("foo"));
     /// ```
     pub fn clear(&mut self) {
         self.fingerprint_vec.clear();
@@ -404,7 +415,7 @@ impl CuckooFilter {
     /// ```
     /// use probabilistic_collections::cuckoo::CuckooFilter;
     ///
-    /// let filter = CuckooFilter::new(100);
+    /// let filter = CuckooFilter::<String>::new(100);
     ///
     /// assert_eq!(filter.len(), 0);
     /// ```
@@ -418,7 +429,7 @@ impl CuckooFilter {
     /// ```
     /// use probabilistic_collections::cuckoo::CuckooFilter;
     ///
-    /// let filter = CuckooFilter::new(100);
+    /// let filter = CuckooFilter::<String>::new(100);
     ///
     /// assert!(filter.is_empty());
     /// ```
@@ -433,7 +444,7 @@ impl CuckooFilter {
     /// ```
     /// use probabilistic_collections::cuckoo::CuckooFilter;
     ///
-    /// let filter = CuckooFilter::new(100);
+    /// let filter = CuckooFilter::<String>::new(100);
     ///
     /// assert_eq!(filter.capacity(), 128);
     /// ```
@@ -447,7 +458,7 @@ impl CuckooFilter {
     /// ```
     /// use probabilistic_collections::cuckoo::CuckooFilter;
     ///
-    /// let filter = CuckooFilter::new(100);
+    /// let filter = CuckooFilter::<String>::new(100);
     ///
     /// assert_eq!(filter.bucket_len(), 32);
     /// ```
@@ -461,7 +472,7 @@ impl CuckooFilter {
     /// ```
     /// use probabilistic_collections::cuckoo::CuckooFilter;
     ///
-    /// let filter = CuckooFilter::new(100);
+    /// let filter = CuckooFilter::<String>::new(100);
     ///
     /// assert_eq!(filter.entries_per_index(), 4);
     /// ```
@@ -475,10 +486,10 @@ impl CuckooFilter {
     /// ```
     /// use probabilistic_collections::cuckoo::CuckooFilter;
     ///
-    /// let mut filter = CuckooFilter::from_parameters(1, 8, 1);
+    /// let mut filter = CuckooFilter::<String>::from_parameters(1, 8, 1);
     ///
-    /// filter.insert(&"foo");
-    /// filter.insert(&"foobar");
+    /// filter.insert("foo");
+    /// filter.insert("foobar");
     /// assert_eq!(filter.extra_items_len(), 1);
     /// ```
     pub fn extra_items_len(&self) -> usize {
@@ -491,10 +502,10 @@ impl CuckooFilter {
     /// ```
     /// use probabilistic_collections::cuckoo::CuckooFilter;
     ///
-    /// let mut filter = CuckooFilter::from_parameters(1, 8, 1);
+    /// let mut filter = CuckooFilter::<String>::from_parameters(1, 8, 1);
     ///
-    /// filter.insert(&"foo");
-    /// filter.insert(&"foobar");
+    /// filter.insert("foo");
+    /// filter.insert("foobar");
     /// assert!(filter.is_nearly_full());
     /// ```
     pub fn is_nearly_full(&self) -> bool {
@@ -507,7 +518,7 @@ impl CuckooFilter {
     /// ```
     /// use probabilistic_collections::cuckoo::CuckooFilter;
     ///
-    /// let filter = CuckooFilter::new(100);
+    /// let filter = CuckooFilter::<String>::new(100);
     ///
     /// assert_eq!(filter.fingerprint_bit_count(), 8);
     /// ```
@@ -522,11 +533,12 @@ impl CuckooFilter {
     /// ```
     /// use probabilistic_collections::cuckoo::CuckooFilter;
     ///
-    /// let mut filter = CuckooFilter::new(100);
-    /// assert!(filter.estimate_fpp() < 1e-6);
+    /// let mut filter = CuckooFilter::<u32>::new(100);
+    /// assert!(filter.estimate_fpp() < 1e-15);
     ///
     /// filter.insert(&0);
-    /// assert!((filter.estimate_fpp() - 0.01) < 1e-6);
+    /// assert!(filter.estimate_fpp() > 1e-15);
+    /// assert!(filter.estimate_fpp() < 0.01);
     /// ```
     pub fn estimate_fpp(&self) -> f64 {
         let fingerprints_count = 2.0f64.powi(self.fingerprint_bit_count() as i32);
@@ -543,9 +555,9 @@ mod tests {
 
     #[test]
     fn test_get_fingerprint() {
-        let fingerprint = CuckooFilter::get_fingerprint(0x7FBFDFEFF7FBFDFE);
+        let fingerprint = CuckooFilter::<String>::get_fingerprint(0x7FBFDFEFF7FBFDFE);
         assert_eq!(
-            CuckooFilter::get_raw_fingerprint(&fingerprint),
+            CuckooFilter::<String>::get_raw_fingerprint(&fingerprint),
             0x7FBFDFEFF7FBFDFE
         );
     }
@@ -554,14 +566,14 @@ mod tests {
     fn test_get_raw_fingerprint() {
         let fingerprint = vec![0xFF, 0xFF];
         assert_eq!(
-            CuckooFilter::get_raw_fingerprint(&fingerprint),
+            CuckooFilter::<String>::get_raw_fingerprint(&fingerprint),
             0xFFFF
         );
     }
 
     #[test]
     fn test_new() {
-        let filter = CuckooFilter::new(100);
+        let filter = CuckooFilter::<String>::new(100);
         assert_eq!(filter.len(), 0);
         assert!(filter.is_empty());
         assert_eq!(filter.capacity(), 128);
@@ -572,7 +584,7 @@ mod tests {
 
     #[test]
     fn test_from_parameters() {
-        let filter = CuckooFilter::from_parameters(100, 16, 8);
+        let filter = CuckooFilter::<String>::from_parameters(100, 16, 8);
         assert_eq!(filter.len(), 0);
         assert!(filter.is_empty());
         assert_eq!(filter.capacity(), 128);
@@ -583,7 +595,7 @@ mod tests {
 
     #[test]
     fn test_from_entries_per_index() {
-        let filter = CuckooFilter::from_entries_per_index(100, 0.01, 4);
+        let filter = CuckooFilter::<String>::from_entries_per_index(100, 0.01, 4);
         assert_eq!(filter.len(), 0);
         assert!(filter.is_empty());
         assert_eq!(filter.capacity(), 128);
@@ -594,7 +606,7 @@ mod tests {
 
     #[test]
     fn test_from_fingerprint_bit_count() {
-        let filter = CuckooFilter::from_fingerprint_bit_count(100, 0.01, 10);
+        let filter = CuckooFilter::<String>::from_fingerprint_bit_count(100, 0.01, 10);
         assert_eq!(filter.len(), 0);
         assert!(filter.is_empty());
         assert_eq!(filter.capacity(), 160);
@@ -605,108 +617,108 @@ mod tests {
 
     #[test]
     fn test_insert() {
-        let mut filter = CuckooFilter::new(100);
-        filter.insert(&"foo");
+        let mut filter = CuckooFilter::<String>::new(100);
+        filter.insert("foo");
         assert_eq!(filter.len(), 1);
         assert!(!filter.is_empty());
-        assert!(filter.contains(&"foo"));
+        assert!(filter.contains("foo"));
     }
 
     #[test]
     fn test_insert_existing_item() {
-        let mut filter = CuckooFilter::new(100);
-        filter.insert(&"foo");
-        filter.insert(&"foo");
+        let mut filter = CuckooFilter::<String>::new(100);
+        filter.insert("foo");
+        filter.insert("foo");
         assert_eq!(filter.len(), 1);
         assert!(!filter.is_empty());
-        assert!(filter.contains(&"foo"));
+        assert!(filter.contains("foo"));
     }
 
     #[test]
     fn test_insert_extra_items() {
-        let mut filter = CuckooFilter::from_parameters(1, 8, 1);
+        let mut filter = CuckooFilter::<String>::from_parameters(1, 8, 1);
 
-        filter.insert(&"foo");
-        filter.insert(&"foobar");
+        filter.insert("foo");
+        filter.insert("foobar");
 
         assert_eq!(filter.len(), 1);
         assert!(!filter.is_empty());
         assert_eq!(filter.extra_items.len(), 1);
         assert!(filter.is_nearly_full());
 
-        assert!(filter.contains(&"foo"));
-        assert!(filter.contains(&"foobar"));
+        assert!(filter.contains("foo"));
+        assert!(filter.contains("foobar"));
     }
 
     #[test]
     fn test_remove() {
-        let mut filter = CuckooFilter::new(100);
-        filter.insert(&"foo");
-        filter.remove(&"foo");
+        let mut filter = CuckooFilter::<String>::new(100);
+        filter.insert("foo");
+        filter.remove("foo");
 
         assert_eq!(filter.len(), 0);
         assert!(filter.is_empty());
-        assert!(!filter.contains(&"foo"));
+        assert!(!filter.contains("foo"));
     }
 
     #[test]
     fn test_remove_extra_items() {
-        let mut filter = CuckooFilter::from_parameters(1, 8, 1);
+        let mut filter = CuckooFilter::<String>::from_parameters(1, 8, 1);
 
-        filter.insert(&"foo");
-        filter.insert(&"foobar");
+        filter.insert("foo");
+        filter.insert("foobar");
 
-        filter.remove(&"foo");
-        filter.remove(&"foobar");
+        filter.remove("foo");
+        filter.remove("foobar");
 
         assert_eq!(filter.len(), 0);
         assert!(filter.is_empty());
         assert_eq!(filter.extra_items.len(), 0);
         assert!(!filter.is_nearly_full());
-        assert!(!filter.contains(&"foo"));
-        assert!(!filter.contains(&"foobar"));
+        assert!(!filter.contains("foo"));
+        assert!(!filter.contains("foobar"));
     }
     #[test]
     fn test_remove_both_indexes() {
-        let mut filter = CuckooFilter::from_parameters(2, 8, 1);
+        let mut filter = CuckooFilter::<String>::from_parameters(2, 8, 1);
 
-        filter.insert(&"foobar");
-        filter.insert(&"barfoo");
-        filter.insert(&"baz");
-        filter.insert(&"qux");
+        filter.insert("foobar");
+        filter.insert("barfoo");
+        filter.insert("baz");
+        filter.insert("qux");
 
-        filter.remove(&"baz");
-        filter.remove(&"qux");
-        filter.remove(&"foobar");
-        filter.remove(&"barfoo");
+        filter.remove("baz");
+        filter.remove("qux");
+        filter.remove("foobar");
+        filter.remove("barfoo");
 
-        assert!(!filter.contains(&"baz"));
-        assert!(!filter.contains(&"qux"));
-        assert!(!filter.contains(&"foobar"));
-        assert!(!filter.contains(&"barfoo"));
+        assert!(!filter.contains("baz"));
+        assert!(!filter.contains("qux"));
+        assert!(!filter.contains("foobar"));
+        assert!(!filter.contains("barfoo"));
     }
 
     #[test]
     fn test_clear() {
-        let mut filter = CuckooFilter::from_parameters(2, 8, 1);
+        let mut filter = CuckooFilter::<String>::from_parameters(2, 8, 1);
 
-        filter.insert(&"foobar");
-        filter.insert(&"barfoo");
-        filter.insert(&"baz");
-        filter.insert(&"qux");
+        filter.insert("foobar");
+        filter.insert("barfoo");
+        filter.insert("baz");
+        filter.insert("qux");
 
         filter.clear();
 
-        assert!(!filter.contains(&"baz"));
-        assert!(!filter.contains(&"qux"));
-        assert!(!filter.contains(&"foobar"));
-        assert!(!filter.contains(&"barfoo"));
+        assert!(!filter.contains("baz"));
+        assert!(!filter.contains("qux"));
+        assert!(!filter.contains("foobar"));
+        assert!(!filter.contains("barfoo"));
     }
 
     #[test]
     fn test_estimate_fpp() {
-        let mut filter = CuckooFilter::from_entries_per_index(100, 0.01, 4);
-        assert!(filter.estimate_fpp() < 1e-6);
+        let mut filter = CuckooFilter::<u32>::from_entries_per_index(100, 0.01, 4);
+        assert!(filter.estimate_fpp() < 1e-15);
 
         filter.insert(&0);
 

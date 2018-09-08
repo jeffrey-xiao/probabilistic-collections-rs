@@ -1,8 +1,10 @@
 //! Space-efficient probabilistic data structure for estimating the number of item occurrences.
+
 use rand::{Rng, XorShiftRng};
-use std::marker::PhantomData;
 use siphasher::sip::SipHasher;
+use std::borrow::Borrow;
 use std::hash::{Hash, Hasher};
+use std::marker::PhantomData;
 
 /// Trait for types that have the logic for estimating the number of item occurrences.
 pub trait CountStrategy {
@@ -63,26 +65,26 @@ impl CountStrategy for CountMedianBiasStrategy {
 /// ```
 /// use probabilistic_collections::count_min_sketch::{CountMinStrategy, CountMinSketch};
 ///
-/// let mut count_min_sketch: CountMinSketch<CountMinStrategy> = CountMinSketch::new(3, 28);
+/// let mut count_min_sketch = CountMinSketch::<CountMinStrategy, String>::new(3, 28);
 ///
-/// count_min_sketch.add(&"foo", 3);
-/// count_min_sketch.add(&"bar", 5);
-/// assert_eq!(count_min_sketch.count(&"foo"), 3);
-/// assert_eq!(count_min_sketch.count(&"bar"), 5);
+/// count_min_sketch.add("foo", 3);
+/// count_min_sketch.add("bar", 5);
+/// assert_eq!(count_min_sketch.count("foo"), 3);
+/// assert_eq!(count_min_sketch.count("bar"), 5);
 ///
-/// count_min_sketch.remove(&"foo", 2);
-/// assert_eq!(count_min_sketch.count(&"foo"), 1);
+/// count_min_sketch.remove("foo", 2);
+/// assert_eq!(count_min_sketch.count("foo"), 1);
 ///
 /// count_min_sketch.clear();
-/// assert_eq!(count_min_sketch.count(&"foo"), 0);
-/// assert_eq!(count_min_sketch.count(&"bar"), 0);
+/// assert_eq!(count_min_sketch.count("foo"), 0);
+/// assert_eq!(count_min_sketch.count("bar"), 0);
 ///
 /// assert_eq!(count_min_sketch.cols(), 28);
 /// assert_eq!(count_min_sketch.rows(), 3);
 /// assert!(count_min_sketch.confidence() <= 0.1);
 /// assert!(count_min_sketch.error() <= 0.05);
 /// ```
-pub struct CountMinSketch<T> {
+pub struct CountMinSketch<T, U> {
     // A 2D grid represented as a 1D vector of signed 64-bit integers to support removals and
     // negatives
     rows: usize,
@@ -90,13 +92,10 @@ pub struct CountMinSketch<T> {
     items: i64,
     grid: Vec<i64>,
     hashers: [SipHasher; 2],
-    _marker: PhantomData<T>,
+    _marker: PhantomData<(T, U)>,
 }
 
-impl<T> CountMinSketch<T>
-where
-    T: CountStrategy,
-{
+impl<T, U> CountMinSketch<T, U> {
     fn get_hashers() -> [SipHasher; 2] {
         let mut rng = XorShiftRng::new_unseeded();
         [
@@ -111,7 +110,7 @@ where
     /// ```
     /// use probabilistic_collections::count_min_sketch::{CountMinStrategy, CountMinSketch};
     ///
-    /// let count_min_sketch: CountMinSketch<CountMinStrategy> = CountMinSketch::new(3, 28);
+    /// let count_min_sketch = CountMinSketch::<CountMinStrategy, String>::new(3, 28);
     ///
     /// assert_eq!(count_min_sketch.rows(), 3);
     /// assert_eq!(count_min_sketch.cols(), 28);
@@ -134,7 +133,7 @@ where
     /// ```
     /// use probabilistic_collections::count_min_sketch::{CountMinStrategy, CountMinSketch};
     ///
-    /// let count_min_sketch: CountMinSketch<CountMinStrategy> = CountMinSketch::from_error(0.1, 0.05);
+    /// let count_min_sketch = CountMinSketch::<CountMinStrategy, String>::from_error(0.1, 0.05);
     ///
     /// assert!(count_min_sketch.confidence() <= 0.1);
     /// assert!(count_min_sketch.error() <= 0.05);
@@ -152,9 +151,10 @@ where
         }
     }
 
-    fn get_hashes<U>(&self, item: &U) -> [u64; 2]
+    fn get_hashes<V>(&self, item: &V) -> [u64; 2]
     where
-        U: Hash,
+        U: Borrow<V>,
+        V: Hash + ?Sized,
     {
         let mut ret = [0; 2];
         for (index, hash) in ret.iter_mut().enumerate() {
@@ -171,13 +171,14 @@ where
     /// ```
     /// use probabilistic_collections::count_min_sketch::{CountMinStrategy, CountMinSketch};
     ///
-    /// let mut count_min_sketch: CountMinSketch<CountMinStrategy> = CountMinSketch::from_error(0.1, 0.05);
-    /// count_min_sketch.add(&"foo", 3);
-    /// assert_eq!(count_min_sketch.count(&"foo"), 3);
+    /// let mut count_min_sketch = CountMinSketch::<CountMinStrategy, String>::from_error(0.1, 0.05);
+    /// count_min_sketch.add("foo", 3);
+    /// assert_eq!(count_min_sketch.count("foo"), 3);
     /// ```
-    pub fn add<U>(&mut self, item: &U, value: i64)
+    pub fn add<V>(&mut self, item: &V, value: i64)
     where
-        U: Hash,
+        U: Borrow<V>,
+        V: Hash + ?Sized,
     {
         self.items += value;
         let hashes = self.get_hashes(item);
@@ -195,14 +196,15 @@ where
     /// ```
     /// use probabilistic_collections::count_min_sketch::{CountMinStrategy, CountMinSketch};
     ///
-    /// let mut count_min_sketch: CountMinSketch<CountMinStrategy> = CountMinSketch::from_error(0.1, 0.05);
-    /// count_min_sketch.add(&"foo", 3);
-    /// count_min_sketch.remove(&"foo", 2);
-    /// assert_eq!(count_min_sketch.count(&"foo"), 1);
+    /// let mut count_min_sketch = CountMinSketch::<CountMinStrategy, String>::from_error(0.1, 0.05);
+    /// count_min_sketch.add("foo", 3);
+    /// count_min_sketch.remove("foo", 2);
+    /// assert_eq!(count_min_sketch.count("foo"), 1);
     /// ```
-    pub fn remove<U>(&mut self, item: &U, value: i64)
+    pub fn remove<V>(&mut self, item: &V, value: i64)
     where
-        U: Hash,
+        U: Borrow<V>,
+        V: Hash + ?Sized,
     {
         self.add(item, -value);
     }
@@ -213,13 +215,15 @@ where
     /// ```
     /// use probabilistic_collections::count_min_sketch::{CountMinStrategy, CountMinSketch};
     ///
-    /// let mut count_min_sketch: CountMinSketch<CountMinStrategy> = CountMinSketch::from_error(0.1, 0.05);
-    /// count_min_sketch.add(&"foo", 3);
-    /// assert_eq!(count_min_sketch.count(&"foo"), 3);
+    /// let mut count_min_sketch = CountMinSketch::<CountMinStrategy, String>::from_error(0.1, 0.05);
+    /// count_min_sketch.add("foo", 3);
+    /// assert_eq!(count_min_sketch.count("foo"), 3);
     /// ```
-    pub fn count<U>(&mut self, item: &U) -> i64
+    pub fn count<V>(&mut self, item: &V) -> i64
     where
-        U: Hash,
+        T: CountStrategy,
+        U: Borrow<V>,
+        V: Hash + ?Sized,
     {
         let iter = ItemValueIter {
             row: 0,
@@ -237,10 +241,10 @@ where
     /// ```
     /// use probabilistic_collections::count_min_sketch::{CountMinStrategy, CountMinSketch};
     ///
-    /// let mut count_min_sketch: CountMinSketch<CountMinStrategy> = CountMinSketch::from_error(0.1, 0.05);
-    /// count_min_sketch.add(&"foo", 3);
+    /// let mut count_min_sketch = CountMinSketch::<CountMinStrategy, String>::from_error(0.1, 0.05);
+    /// count_min_sketch.add("foo", 3);
     /// count_min_sketch.clear();
-    /// assert_eq!(count_min_sketch.count(&"foo"), 0);
+    /// assert_eq!(count_min_sketch.count("foo"), 0);
     /// ```
     pub fn clear(&mut self) {
         for value in &mut self.grid {
@@ -254,7 +258,7 @@ where
     /// ```
     /// use probabilistic_collections::count_min_sketch::{CountMinStrategy, CountMinSketch};
     ///
-    /// let count_min_sketch: CountMinSketch<CountMinStrategy> = CountMinSketch::new(3, 28);
+    /// let count_min_sketch = CountMinSketch::<CountMinStrategy, String>::new(3, 28);
     /// assert_eq!(count_min_sketch.rows(), 3);
     /// ```
     pub fn rows(&self) -> usize {
@@ -267,7 +271,7 @@ where
     /// ```
     /// use probabilistic_collections::count_min_sketch::{CountMinStrategy, CountMinSketch};
     ///
-    /// let count_min_sketch: CountMinSketch<CountMinStrategy> = CountMinSketch::new(3, 28);
+    /// let count_min_sketch = CountMinSketch::<CountMinStrategy, String>::new(3, 28);
     /// assert_eq!(count_min_sketch.cols(), 28);
     /// ```
     pub fn cols(&self) -> usize {
@@ -280,7 +284,7 @@ where
     /// ```
     /// use probabilistic_collections::count_min_sketch::{CountMinStrategy, CountMinSketch};
     ///
-    /// let count_min_sketch: CountMinSketch<CountMinStrategy> = CountMinSketch::from_error(0.1, 0.05);
+    /// let count_min_sketch = CountMinSketch::<CountMinStrategy, String>::from_error(0.1, 0.05);
     /// assert!(count_min_sketch.confidence() <= 0.1);
     /// ```
     pub fn confidence(&self) -> f64 {
@@ -293,7 +297,7 @@ where
     /// ```
     /// use probabilistic_collections::count_min_sketch::{CountMinStrategy, CountMinSketch};
     ///
-    /// let count_min_sketch: CountMinSketch<CountMinStrategy> = CountMinSketch::from_error(0.1, 0.05);
+    /// let count_min_sketch = CountMinSketch::<CountMinStrategy, String>::from_error(0.1, 0.05);
     /// assert!(count_min_sketch.error() <= 0.05);
     /// ```
     pub fn error(&self) -> f64 {
@@ -334,7 +338,7 @@ mod tests {
 
     #[test]
     fn test_new() {
-        let count_min_sketch: CountMinSketch<CountMinStrategy> = CountMinSketch::new(3, 28);
+        let count_min_sketch = CountMinSketch::<CountMinStrategy, String>::new(3, 28);
 
         assert_eq!(count_min_sketch.cols(), 28);
         assert_eq!(count_min_sketch.rows(), 3);
@@ -344,7 +348,7 @@ mod tests {
 
     #[test]
     fn test_from_error() {
-        let count_min_sketch: CountMinSketch<CountMinStrategy> = CountMinSketch::from_error(0.1, 0.05);
+        let count_min_sketch = CountMinSketch::<CountMinStrategy, String>::from_error(0.1, 0.05);
 
         assert_eq!(count_min_sketch.cols(), 28);
         assert_eq!(count_min_sketch.rows(), 3);
@@ -354,42 +358,42 @@ mod tests {
 
     #[test]
     fn test_add() {
-        let mut count_min_sketch: CountMinSketch<CountMinStrategy> = CountMinSketch::from_error(0.1, 0.05);
-        count_min_sketch.add(&"foo", 3);
-        assert_eq!(count_min_sketch.count(&"foo"), 3);
+        let mut count_min_sketch = CountMinSketch::<CountMinStrategy, String>::from_error(0.1, 0.05);
+        count_min_sketch.add("foo", 3);
+        assert_eq!(count_min_sketch.count("foo"), 3);
 
-        let mut count_min_sketch: CountMinSketch<CountMeanStrategy> = CountMinSketch::from_error(0.1, 0.05);
-        count_min_sketch.add(&"foo", 3);
-        assert_eq!(count_min_sketch.count(&"foo"), 3);
+        let mut count_min_sketch = CountMinSketch::<CountMeanStrategy, String>::from_error(0.1, 0.05);
+        count_min_sketch.add("foo", 3);
+        assert_eq!(count_min_sketch.count("foo"), 3);
 
-        let mut count_min_sketch: CountMinSketch<CountMedianBiasStrategy> = CountMinSketch::from_error(0.1, 0.05);
-        count_min_sketch.add(&"foo", 3);
-        assert_eq!(count_min_sketch.count(&"foo"), 3);
+        let mut count_min_sketch = CountMinSketch::<CountMedianBiasStrategy, String>::from_error(0.1, 0.05);
+        count_min_sketch.add("foo", 3);
+        assert_eq!(count_min_sketch.count("foo"), 3);
     }
 
     #[test]
     fn test_remove() {
-        let mut count_min_sketch: CountMinSketch<CountMinStrategy> = CountMinSketch::from_error(0.1, 0.05);
-        count_min_sketch.add(&"foo", 3);
-        count_min_sketch.remove(&"foo", 3);
-        assert_eq!(count_min_sketch.count(&"foo"), 0);
+        let mut count_min_sketch = CountMinSketch::<CountMinStrategy, String>::from_error(0.1, 0.05);
+        count_min_sketch.add("foo", 3);
+        count_min_sketch.remove("foo", 3);
+        assert_eq!(count_min_sketch.count("foo"), 0);
 
-        let mut count_min_sketch: CountMinSketch<CountMeanStrategy> = CountMinSketch::from_error(0.1, 0.05);
-        count_min_sketch.add(&"foo", 3);
-        count_min_sketch.remove(&"foo", 3);
-        assert_eq!(count_min_sketch.count(&"foo"), 0);
+        let mut count_min_sketch = CountMinSketch::<CountMeanStrategy, String>::from_error(0.1, 0.05);
+        count_min_sketch.add("foo", 3);
+        count_min_sketch.remove("foo", 3);
+        assert_eq!(count_min_sketch.count("foo"), 0);
 
-        let mut count_min_sketch: CountMinSketch<CountMedianBiasStrategy> = CountMinSketch::from_error(0.1, 0.05);
-        count_min_sketch.add(&"foo", 3);
-        count_min_sketch.remove(&"foo", 3);
-        assert_eq!(count_min_sketch.count(&"foo"), 0);
+        let mut count_min_sketch = CountMinSketch::<CountMedianBiasStrategy, String>::from_error(0.1, 0.05);
+        count_min_sketch.add("foo", 3);
+        count_min_sketch.remove("foo", 3);
+        assert_eq!(count_min_sketch.count("foo"), 0);
     }
 
     #[test]
     fn test_clear() {
-        let mut count_min_sketch: CountMinSketch<CountMinStrategy> = CountMinSketch::from_error(0.1, 0.05);
-        count_min_sketch.add(&"foo", 3);
+        let mut count_min_sketch = CountMinSketch::<CountMinStrategy, String>::from_error(0.1, 0.05);
+        count_min_sketch.add("foo", 3);
         count_min_sketch.clear();
-        assert_eq!(count_min_sketch.count(&"foo"), 0);
+        assert_eq!(count_min_sketch.count("foo"), 0);
     }
 }

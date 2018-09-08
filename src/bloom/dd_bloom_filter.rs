@@ -1,8 +1,10 @@
 use bit_vec::BitVec;
 use rand::{Rng, XorShiftRng};
 use siphasher::sip::SipHasher;
+use std::borrow::Borrow;
 use std::f64::consts;
 use std::hash::{Hash, Hasher};
+use std::marker::PhantomData;
 
 const PRIME: u64 = 0xFFFF_FFFF_FFFF_FFC5;
 
@@ -16,28 +18,29 @@ const PRIME: u64 = 0xFFFF_FFFF_FFFF_FFC5;
 /// ```
 /// use probabilistic_collections::bloom::BSBloomFilter;
 ///
-/// let mut filter = BSBloomFilter::new(10, 0.01);
+/// let mut filter = BSBloomFilter::<String>::new(10, 0.01);
 ///
-/// assert!(!filter.contains(&"foo"));
-/// filter.insert(&"foo");
-/// assert!(filter.contains(&"foo"));
+/// assert!(!filter.contains("foo"));
+/// filter.insert("foo");
+/// assert!(filter.contains("foo"));
 ///
 /// filter.clear();
-/// assert!(!filter.contains(&"foo"));
+/// assert!(!filter.contains("foo"));
 ///
 /// assert_eq!(filter.len(), 70);
 /// assert_eq!(filter.bit_count(), 10);
 /// assert_eq!(filter.hasher_count(), 7);
 /// ```
-pub struct BSBloomFilter {
+pub struct BSBloomFilter<T> {
     bit_vec: BitVec,
     hashers: [SipHasher; 2],
     rng: XorShiftRng,
     bit_count: usize,
     hasher_count: usize,
+    _marker: PhantomData<T>,
 }
 
-impl BSBloomFilter {
+impl<T> BSBloomFilter<T> {
     fn get_hasher_count(fpp: f64) -> usize {
         ((1.0 + fpp.ln() / (1.0 - 1.0 / consts::E).ln() + 1.0) / 2.0).ceil() as usize
     }
@@ -49,7 +52,7 @@ impl BSBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::BSBloomFilter;
     ///
-    /// let filter = BSBloomFilter::new(10, 0.01);
+    /// let filter = BSBloomFilter::<String>::new(10, 0.01);
     /// ```
     pub fn new(bit_count: usize, fpp: f64) -> Self {
         let hasher_count = Self::get_hasher_count(fpp);
@@ -63,12 +66,14 @@ impl BSBloomFilter {
             rng,
             bit_count,
             hasher_count,
+            _marker: PhantomData,
         }
     }
 
-    fn get_hashes<T>(&self, item: &T) -> [u64; 2]
+    fn get_hashes<U>(&self, item: &U) -> [u64; 2]
     where
-        T: Hash,
+        T: Borrow<U>,
+        U: Hash + ?Sized,
     {
         let mut ret = [0; 2];
         for (index, hash) in ret.iter_mut().enumerate() {
@@ -85,13 +90,14 @@ impl BSBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::BSBloomFilter;
     ///
-    /// let mut filter = BSBloomFilter::new(10, 0.01);
+    /// let mut filter = BSBloomFilter::<String>::new(10, 0.01);
     ///
-    /// filter.insert(&"foo");
+    /// filter.insert("foo");
     /// ```
-    pub fn insert<T>(&mut self, item: &T)
+    pub fn insert<U>(&mut self, item: &U)
     where
-        T: Hash,
+        T: Borrow<U>,
+        U: Hash + ?Sized,
     {
         let hashes = self.get_hashes(item);
         if !self.contains_hashes(hashes) {
@@ -119,15 +125,16 @@ impl BSBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::BSBloomFilter;
     ///
-    /// let mut filter = BSBloomFilter::new(10, 0.01);
+    /// let mut filter = BSBloomFilter::<String>::new(10, 0.01);
     ///
-    /// assert!(!filter.contains(&"foo"));
-    /// filter.insert(&"foo");
-    /// assert!(filter.contains(&"foo"));
+    /// assert!(!filter.contains("foo"));
+    /// filter.insert("foo");
+    /// assert!(filter.contains("foo"));
     /// ```
-    pub fn contains<T>(&self, item: &T) -> bool
+    pub fn contains<U>(&self, item: &U) -> bool
     where
-        T: Hash,
+        T: Borrow<U>,
+        U: Hash + ?Sized,
     {
         let hashes = self.get_hashes(item);
         self.contains_hashes(hashes)
@@ -149,7 +156,7 @@ impl BSBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::BSBloomFilter;
     ///
-    /// let filter = BSBloomFilter::new(10, 0.01);
+    /// let filter = BSBloomFilter::<String>::new(10, 0.01);
     ///
     /// assert_eq!(filter.len(), 70);
     /// ```
@@ -163,7 +170,7 @@ impl BSBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::BSBloomFilter;
     ///
-    /// let filter = BSBloomFilter::new(10, 0.01);
+    /// let filter = BSBloomFilter::<String>::new(10, 0.01);
     ///
     /// assert!(!filter.is_empty());
     /// ```
@@ -177,7 +184,7 @@ impl BSBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::BSBloomFilter;
     ///
-    /// let filter = BSBloomFilter::new(10, 0.01);
+    /// let filter = BSBloomFilter::<String>::new(10, 0.01);
     ///
     /// assert_eq!(filter.bit_count(), 10);
     /// ```
@@ -191,7 +198,7 @@ impl BSBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::BSBloomFilter;
     ///
-    /// let filter = BSBloomFilter::new(10, 0.01);
+    /// let filter = BSBloomFilter::<String>::new(10, 0.01);
     ///
     /// assert_eq!(filter.hasher_count(), 7);
     /// ```
@@ -205,12 +212,12 @@ impl BSBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::BSBloomFilter;
     ///
-    /// let mut filter = BSBloomFilter::new(10, 0.01);
+    /// let mut filter = BSBloomFilter::<String>::new(10, 0.01);
     ///
-    /// filter.insert(&"foo");
+    /// filter.insert("foo");
     /// filter.clear();
     ///
-    /// assert!(!filter.contains(&"foo"));
+    /// assert!(!filter.contains("foo"));
     /// ```
     pub fn clear(&mut self) {
         self.bit_vec.set_all(false)
@@ -222,8 +229,8 @@ impl BSBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::BSBloomFilter;
     ///
-    /// let mut filter = BSBloomFilter::new(10, 0.01);
-    /// filter.insert(&"foo");
+    /// let mut filter = BSBloomFilter::<String>::new(10, 0.01);
+    /// filter.insert("foo");
     ///
     /// assert_eq!(filter.count_ones(), 7);
     /// ```
@@ -237,8 +244,8 @@ impl BSBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::BSBloomFilter;
     ///
-    /// let mut filter = BSBloomFilter::new(10, 0.01);
-    /// filter.insert(&"foo");
+    /// let mut filter = BSBloomFilter::<String>::new(10, 0.01);
+    /// filter.insert("foo");
     ///
     /// assert_eq!(filter.count_zeros(), 63);
     /// ```
@@ -257,28 +264,29 @@ impl BSBloomFilter {
 /// ```
 /// use probabilistic_collections::bloom::BSSDBloomFilter;
 ///
-/// let mut filter = BSSDBloomFilter::new(10, 0.01);
+/// let mut filter = BSSDBloomFilter::<String>::new(10, 0.01);
 ///
-/// assert!(!filter.contains(&"foo"));
-/// filter.insert(&"foo");
-/// assert!(filter.contains(&"foo"));
+/// assert!(!filter.contains("foo"));
+/// filter.insert("foo");
+/// assert!(filter.contains("foo"));
 ///
 /// filter.clear();
-/// assert!(!filter.contains(&"foo"));
+/// assert!(!filter.contains("foo"));
 ///
 /// assert_eq!(filter.len(), 70);
 /// assert_eq!(filter.bit_count(), 10);
 /// assert_eq!(filter.hasher_count(), 7);
 /// ```
-pub struct BSSDBloomFilter {
+pub struct BSSDBloomFilter<T> {
     bit_vec: BitVec,
     hashers: [SipHasher; 2],
     rng: XorShiftRng,
     bit_count: usize,
     hasher_count: usize,
+    _marker: PhantomData<T>,
 }
 
-impl BSSDBloomFilter {
+impl<T> BSSDBloomFilter<T> {
     fn get_hasher_count(fpp: f64) -> usize {
         ((1.0 + fpp.ln() / (1.0 - 1.0 / consts::E).ln() + 1.0) / 2.0).ceil() as usize
     }
@@ -290,7 +298,7 @@ impl BSSDBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::BSSDBloomFilter;
     ///
-    /// let filter = BSSDBloomFilter::new(10, 0.01);
+    /// let filter = BSSDBloomFilter::<String>::new(10, 0.01);
     /// ```
     pub fn new(bit_count: usize, fpp: f64) -> Self {
         let hasher_count = Self::get_hasher_count(fpp);
@@ -304,12 +312,14 @@ impl BSSDBloomFilter {
             rng,
             bit_count,
             hasher_count,
+            _marker: PhantomData,
         }
     }
 
-    fn get_hashes<T>(&self, item: &T) -> [u64; 2]
+    fn get_hashes<U>(&self, item: &U) -> [u64; 2]
     where
-        T: Hash,
+        T: Borrow<U>,
+        U: Hash + ?Sized,
     {
         let mut ret = [0; 2];
         for (index, hash) in ret.iter_mut().enumerate() {
@@ -326,13 +336,14 @@ impl BSSDBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::BSSDBloomFilter;
     ///
-    /// let mut filter = BSSDBloomFilter::new(10, 0.01);
+    /// let mut filter = BSSDBloomFilter::<String>::new(10, 0.01);
     ///
-    /// filter.insert(&"foo");
+    /// filter.insert("foo");
     /// ```
-    pub fn insert<T>(&mut self, item: &T)
+    pub fn insert<U>(&mut self, item: &U)
     where
-        T: Hash,
+        T: Borrow<U>,
+        U: Hash + ?Sized,
     {
         if !self.contains(item) {
             let hashes = self.get_hashes(item);
@@ -360,15 +371,16 @@ impl BSSDBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::BSSDBloomFilter;
     ///
-    /// let mut filter = BSSDBloomFilter::new(10, 0.01);
+    /// let mut filter = BSSDBloomFilter::<String>::new(10, 0.01);
     ///
-    /// assert!(!filter.contains(&"foo"));
-    /// filter.insert(&"foo");
-    /// assert!(filter.contains(&"foo"));
+    /// assert!(!filter.contains("foo"));
+    /// filter.insert("foo");
+    /// assert!(filter.contains("foo"));
     /// ```
-    pub fn contains<T>(&self, item: &T) -> bool
+    pub fn contains<U>(&self, item: &U) -> bool
     where
-        T: Hash,
+        T: Borrow<U>,
+        U: Hash + ?Sized,
     {
         let hashes = self.get_hashes(item);
         (0..self.hasher_count).all(|index| {
@@ -386,7 +398,7 @@ impl BSSDBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::BSSDBloomFilter;
     ///
-    /// let filter = BSSDBloomFilter::new(10, 0.01);
+    /// let filter = BSSDBloomFilter::<String>::new(10, 0.01);
     ///
     /// assert_eq!(filter.len(), 70);
     /// ```
@@ -400,7 +412,7 @@ impl BSSDBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::BSSDBloomFilter;
     ///
-    /// let filter = BSSDBloomFilter::new(10, 0.01);
+    /// let filter = BSSDBloomFilter::<String>::new(10, 0.01);
     ///
     /// assert!(!filter.is_empty());
     /// ```
@@ -414,7 +426,7 @@ impl BSSDBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::BSSDBloomFilter;
     ///
-    /// let filter = BSSDBloomFilter::new(10, 0.01);
+    /// let filter = BSSDBloomFilter::<String>::new(10, 0.01);
     ///
     /// assert_eq!(filter.bit_count(), 10);
     /// ```
@@ -428,7 +440,7 @@ impl BSSDBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::BSSDBloomFilter;
     ///
-    /// let filter = BSSDBloomFilter::new(10, 0.01);
+    /// let filter = BSSDBloomFilter::<String>::new(10, 0.01);
     ///
     /// assert_eq!(filter.hasher_count(), 7);
     /// ```
@@ -442,12 +454,12 @@ impl BSSDBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::BSSDBloomFilter;
     ///
-    /// let mut filter = BSSDBloomFilter::new(10, 0.01);
+    /// let mut filter = BSSDBloomFilter::<String>::new(10, 0.01);
     ///
-    /// filter.insert(&"foo");
+    /// filter.insert("foo");
     /// filter.clear();
     ///
-    /// assert!(!filter.contains(&"foo"));
+    /// assert!(!filter.contains("foo"));
     /// ```
     pub fn clear(&mut self) {
         self.bit_vec.set_all(false)
@@ -459,8 +471,8 @@ impl BSSDBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::BSSDBloomFilter;
     ///
-    /// let mut filter = BSSDBloomFilter::new(10, 0.01);
-    /// filter.insert(&"foo");
+    /// let mut filter = BSSDBloomFilter::<String>::new(10, 0.01);
+    /// filter.insert("foo");
     ///
     /// assert_eq!(filter.count_ones(), 7);
     /// ```
@@ -474,8 +486,8 @@ impl BSSDBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::BSSDBloomFilter;
     ///
-    /// let mut filter = BSSDBloomFilter::new(10, 0.01);
-    /// filter.insert(&"foo");
+    /// let mut filter = BSSDBloomFilter::<String>::new(10, 0.01);
+    /// filter.insert("foo");
     ///
     /// assert_eq!(filter.count_zeros(), 63);
     /// ```
@@ -494,28 +506,29 @@ impl BSSDBloomFilter {
 /// ```
 /// use probabilistic_collections::bloom::RLBSBloomFilter;
 ///
-/// let mut filter = RLBSBloomFilter::new(10, 0.01);
+/// let mut filter = RLBSBloomFilter::<String>::new(10, 0.01);
 ///
-/// assert!(!filter.contains(&"foo"));
-/// filter.insert(&"foo");
-/// assert!(filter.contains(&"foo"));
+/// assert!(!filter.contains("foo"));
+/// filter.insert("foo");
+/// assert!(filter.contains("foo"));
 ///
 /// filter.clear();
-/// assert!(!filter.contains(&"foo"));
+/// assert!(!filter.contains("foo"));
 ///
 /// assert_eq!(filter.len(), 70);
 /// assert_eq!(filter.bit_count(), 10);
 /// assert_eq!(filter.hasher_count(), 7);
 /// ```
-pub struct RLBSBloomFilter {
+pub struct RLBSBloomFilter<T> {
     bit_vecs: Vec<BitVec>,
     hashers: [SipHasher; 2],
     rng: XorShiftRng,
     bit_count: usize,
     hasher_count: usize,
+    _marker: PhantomData<T>,
 }
 
-impl RLBSBloomFilter {
+impl<T> RLBSBloomFilter<T> {
     fn get_hasher_count(fpp: f64) -> usize {
         ((1.0 + fpp.ln() / (1.0 - 1.0 / consts::E).ln() + 1.0) / 2.0).ceil() as usize
     }
@@ -527,7 +540,7 @@ impl RLBSBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::RLBSBloomFilter;
     ///
-    /// let filter = RLBSBloomFilter::new(10, 0.01);
+    /// let filter = RLBSBloomFilter::<String>::new(10, 0.01);
     /// ```
     pub fn new(bit_count: usize, fpp: f64) -> Self {
         let hasher_count = Self::get_hasher_count(fpp);
@@ -541,12 +554,14 @@ impl RLBSBloomFilter {
             rng,
             bit_count,
             hasher_count,
+            _marker: PhantomData,
         }
     }
 
-    fn get_hashes<T>(&self, item: &T) -> [u64; 2]
+    fn get_hashes<U>(&self, item: &U) -> [u64; 2]
     where
-        T: Hash,
+        T: Borrow<U>,
+        U: Hash + ?Sized,
     {
         let mut ret = [0; 2];
         for (index, hash) in ret.iter_mut().enumerate() {
@@ -563,13 +578,14 @@ impl RLBSBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::RLBSBloomFilter;
     ///
-    /// let mut filter = RLBSBloomFilter::new(10, 0.01);
+    /// let mut filter = RLBSBloomFilter::<String>::new(10, 0.01);
     ///
-    /// filter.insert(&"foo");
+    /// filter.insert("foo");
     /// ```
-    pub fn insert<T>(&mut self, item: &T)
+    pub fn insert<U>(&mut self, item: &U)
     where
-        T: Hash,
+        T: Borrow<U>,
+        U: Hash + ?Sized,
     {
         if !self.contains(item) {
             let hashes = self.get_hashes(item);
@@ -599,15 +615,16 @@ impl RLBSBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::RLBSBloomFilter;
     ///
-    /// let mut filter = RLBSBloomFilter::new(10, 0.01);
+    /// let mut filter = RLBSBloomFilter::<String>::new(10, 0.01);
     ///
-    /// assert!(!filter.contains(&"foo"));
-    /// filter.insert(&"foo");
-    /// assert!(filter.contains(&"foo"));
+    /// assert!(!filter.contains("foo"));
+    /// filter.insert("foo");
+    /// assert!(filter.contains("foo"));
     /// ```
-    pub fn contains<T>(&self, item: &T) -> bool
+    pub fn contains<U>(&self, item: &U) -> bool
     where
-        T: Hash,
+        T: Borrow<U>,
+        U: Hash + ?Sized,
     {
         let hashes = self.get_hashes(item);
         (0..self.hasher_count).all(|filter_index| {
@@ -624,7 +641,7 @@ impl RLBSBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::RLBSBloomFilter;
     ///
-    /// let filter = RLBSBloomFilter::new(10, 0.01);
+    /// let filter = RLBSBloomFilter::<String>::new(10, 0.01);
     ///
     /// assert_eq!(filter.len(), 70);
     /// ```
@@ -638,7 +655,7 @@ impl RLBSBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::RLBSBloomFilter;
     ///
-    /// let filter = RLBSBloomFilter::new(10, 0.01);
+    /// let filter = RLBSBloomFilter::<String>::new(10, 0.01);
     ///
     /// assert!(!filter.is_empty());
     /// ```
@@ -652,7 +669,7 @@ impl RLBSBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::RLBSBloomFilter;
     ///
-    /// let filter = RLBSBloomFilter::new(10, 0.01);
+    /// let filter = RLBSBloomFilter::<String>::new(10, 0.01);
     ///
     /// assert_eq!(filter.bit_count(), 10);
     /// ```
@@ -666,7 +683,7 @@ impl RLBSBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::RLBSBloomFilter;
     ///
-    /// let filter = RLBSBloomFilter::new(10, 0.01);
+    /// let filter = RLBSBloomFilter::<String>::new(10, 0.01);
     ///
     /// assert_eq!(filter.hasher_count(), 7);
     /// ```
@@ -680,12 +697,12 @@ impl RLBSBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::RLBSBloomFilter;
     ///
-    /// let mut filter = RLBSBloomFilter::new(10, 0.01);
+    /// let mut filter = RLBSBloomFilter::<String>::new(10, 0.01);
     ///
-    /// filter.insert(&"foo");
+    /// filter.insert("foo");
     /// filter.clear();
     ///
-    /// assert!(!filter.contains(&"foo"));
+    /// assert!(!filter.contains("foo"));
     /// ```
     pub fn clear(&mut self) {
         self.bit_vecs
@@ -699,8 +716,8 @@ impl RLBSBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::RLBSBloomFilter;
     ///
-    /// let mut filter = RLBSBloomFilter::new(10, 0.01);
-    /// filter.insert(&"foo");
+    /// let mut filter = RLBSBloomFilter::<String>::new(10, 0.01);
+    /// filter.insert("foo");
     ///
     /// assert_eq!(filter.count_ones(), 7);
     /// ```
@@ -717,8 +734,8 @@ impl RLBSBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::RLBSBloomFilter;
     ///
-    /// let mut filter = RLBSBloomFilter::new(10, 0.01);
-    /// filter.insert(&"foo");
+    /// let mut filter = RLBSBloomFilter::<String>::new(10, 0.01);
+    /// filter.insert("foo");
     ///
     /// assert_eq!(filter.count_zeros(), 63);
     /// ```
@@ -738,16 +755,16 @@ mod tests {
 
     #[test]
     fn test_bs() {
-        let mut filter = BSBloomFilter::new(10, 0.01);
+        let mut filter = BSBloomFilter::<String>::new(10, 0.01);
 
-        assert!(!filter.contains(&"foo"));
-        filter.insert(&"foo");
-        assert!(filter.contains(&"foo"));
+        assert!(!filter.contains("foo"));
+        filter.insert("foo");
+        assert!(filter.contains("foo"));
         assert_eq!(filter.count_ones(), 7);
         assert_eq!(filter.count_zeros(), 63);
 
         filter.clear();
-        assert!(!filter.contains(&"foo"));
+        assert!(!filter.contains("foo"));
 
         assert_eq!(filter.len(), 70);
         assert_eq!(filter.bit_count(), 10);
@@ -756,16 +773,16 @@ mod tests {
 
     #[test]
     fn test_bssd() {
-        let mut filter = BSSDBloomFilter::new(10, 0.01);
+        let mut filter = BSSDBloomFilter::<String>::new(10, 0.01);
 
-        assert!(!filter.contains(&"foo"));
-        filter.insert(&"foo");
-        assert!(filter.contains(&"foo"));
+        assert!(!filter.contains("foo"));
+        filter.insert("foo");
+        assert!(filter.contains("foo"));
         assert_eq!(filter.count_ones(), 7);
         assert_eq!(filter.count_zeros(), 63);
 
         filter.clear();
-        assert!(!filter.contains(&"foo"));
+        assert!(!filter.contains("foo"));
 
         assert_eq!(filter.len(), 70);
         assert_eq!(filter.bit_count(), 10);
@@ -774,16 +791,16 @@ mod tests {
 
     #[test]
     fn test_rlbs() {
-        let mut filter = RLBSBloomFilter::new(10, 0.01);
+        let mut filter = RLBSBloomFilter::<String>::new(10, 0.01);
 
-        assert!(!filter.contains(&"foo"));
-        filter.insert(&"foo");
-        assert!(filter.contains(&"foo"));
+        assert!(!filter.contains("foo"));
+        filter.insert("foo");
+        assert!(filter.contains("foo"));
         assert_eq!(filter.count_ones(), 7);
         assert_eq!(filter.count_zeros(), 63);
 
         filter.clear();
-        assert!(!filter.contains(&"foo"));
+        assert!(!filter.contains("foo"));
 
         assert_eq!(filter.len(), 70);
         assert_eq!(filter.bit_count(), 10);

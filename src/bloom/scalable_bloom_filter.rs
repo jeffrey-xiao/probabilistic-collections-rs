@@ -1,4 +1,5 @@
 use bloom::BloomFilter;
+use std::borrow::Borrow;
 use std::hash::Hash;
 
 /// A growable, space-efficient probabilistic data structure to test for membership in a set.
@@ -14,27 +15,27 @@ use std::hash::Hash;
 /// ```
 /// use probabilistic_collections::bloom::ScalableBloomFilter;
 ///
-/// let mut filter = ScalableBloomFilter::new(100, 0.01, 2.0, 0.5);
+/// let mut filter = ScalableBloomFilter::<String>::new(100, 0.01, 2.0, 0.5);
 ///
-/// assert!(!filter.contains(&"foo"));
-/// filter.insert(&"foo");
-/// assert!(filter.contains(&"foo"));
+/// assert!(!filter.contains("foo"));
+/// filter.insert("foo");
+/// assert!(filter.contains("foo"));
 ///
 /// filter.clear();
-/// assert!(!filter.contains(&"foo"));
+/// assert!(!filter.contains("foo"));
 ///
 /// assert_eq!(filter.len(), 100);
 /// assert_eq!(filter.filter_count(), 1);
 /// ```
-pub struct ScalableBloomFilter {
-    filters: Vec<BloomFilter>,
+pub struct ScalableBloomFilter<T> {
+    filters: Vec<BloomFilter<T>>,
     approximate_bits_used: usize,
     initial_fpp: f64,
     growth_ratio: f64,
     tightening_ratio: f64,
 }
 
-impl ScalableBloomFilter {
+impl<T> ScalableBloomFilter<T> {
     /// Constructs a new, empty `ScalableBloomFilter` with initially `initial_bit_count` bits and
     /// an initial maximum false positive probability of `fpp`. Every time a new bloom filter is
     /// added, the size will be `growth_ratio` multiplied by the previous size, and the false
@@ -45,7 +46,7 @@ impl ScalableBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::ScalableBloomFilter;
     ///
-    /// let filter = ScalableBloomFilter::new(100, 0.01, 2.0, 0.5);
+    /// let filter = ScalableBloomFilter::<String>::new(100, 0.01, 2.0, 0.5);
     /// ```
     pub fn new(
         initial_bit_count: usize,
@@ -91,13 +92,14 @@ impl ScalableBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::ScalableBloomFilter;
     ///
-    /// let mut filter = ScalableBloomFilter::new(100, 0.01, 2.0, 0.5);
+    /// let mut filter = ScalableBloomFilter::<String>::new(100, 0.01, 2.0, 0.5);
     ///
-    /// filter.insert(&"foo");
+    /// filter.insert("foo");
     /// ```
-    pub fn insert<T>(&mut self, item: &T)
+    pub fn insert<U>(&mut self, item: &U)
     where
-        T: Hash,
+        T: Borrow<U>,
+        U: Hash + ?Sized,
     {
         if !self.filters.iter().any(|filter| filter.contains(item)) {
             let filter = self.filters.last_mut().expect("Expected non-empty filters.");
@@ -113,15 +115,16 @@ impl ScalableBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::ScalableBloomFilter;
     ///
-    /// let mut filter = ScalableBloomFilter::new(100, 0.01, 2.0, 0.5);
+    /// let mut filter = ScalableBloomFilter::<String>::new(100, 0.01, 2.0, 0.5);
     ///
-    /// assert!(!filter.contains(&"foo"));
-    /// filter.insert(&"foo");
-    /// assert!(filter.contains(&"foo"));
+    /// assert!(!filter.contains("foo"));
+    /// filter.insert("foo");
+    /// assert!(filter.contains("foo"));
     /// ```
-    pub fn contains<T>(&self, item: &T) -> bool
+    pub fn contains<U>(&self, item: &U) -> bool
     where
-        T: Hash,
+        T: Borrow<U>,
+        U: Hash + ?Sized,
     {
         self.filters.iter().any(|filter| filter.contains(item))
     }
@@ -132,7 +135,7 @@ impl ScalableBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::ScalableBloomFilter;
     ///
-    /// let filter = ScalableBloomFilter::new(100, 0.01, 2.0, 0.5);
+    /// let filter = ScalableBloomFilter::<String>::new(100, 0.01, 2.0, 0.5);
     ///
     /// assert_eq!(filter.len(), 100);
     /// ```
@@ -146,7 +149,7 @@ impl ScalableBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::ScalableBloomFilter;
     ///
-    /// let filter = ScalableBloomFilter::new(100, 0.01, 2.0, 0.5);
+    /// let filter = ScalableBloomFilter::<String>::new(100, 0.01, 2.0, 0.5);
     ///
     /// assert!(!filter.is_empty());
     /// ```
@@ -160,7 +163,7 @@ impl ScalableBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::ScalableBloomFilter;
     ///
-    /// let filter = ScalableBloomFilter::new(100, 0.01, 2.0, 0.5);
+    /// let filter = ScalableBloomFilter::<String>::new(100, 0.01, 2.0, 0.5);
     ///
     /// assert_eq!(filter.filter_count(), 1);
     /// ```
@@ -174,12 +177,12 @@ impl ScalableBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::ScalableBloomFilter;
     ///
-    /// let mut filter = ScalableBloomFilter::new(100, 0.01, 2.0, 0.5);
+    /// let mut filter = ScalableBloomFilter::<String>::new(100, 0.01, 2.0, 0.5);
     ///
-    /// filter.insert(&"foo");
+    /// filter.insert("foo");
     /// filter.clear();
     ///
-    /// assert!(!filter.contains(&"foo"));
+    /// assert!(!filter.contains("foo"));
     /// ```
     pub fn clear(&mut self) {
         let initial_bit_count = self.filters.first().expect("Expected non-empty filters.").len();
@@ -193,8 +196,8 @@ impl ScalableBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::ScalableBloomFilter;
     ///
-    /// let mut filter = ScalableBloomFilter::new(100, 0.01, 2.0, 0.5);
-    /// filter.insert(&"foo");
+    /// let mut filter = ScalableBloomFilter::<String>::new(100, 0.01, 2.0, 0.5);
+    /// filter.insert("foo");
     ///
     /// assert_eq!(filter.count_ones(), 7);
     /// ```
@@ -208,8 +211,8 @@ impl ScalableBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::ScalableBloomFilter;
     ///
-    /// let mut filter = ScalableBloomFilter::new(100, 0.01, 2.0, 0.5);
-    /// filter.insert(&"foo");
+    /// let mut filter = ScalableBloomFilter::<String>::new(100, 0.01, 2.0, 0.5);
+    /// filter.insert("foo");
     ///
     /// assert_eq!(filter.count_zeros(), 93);
     /// ```
@@ -224,10 +227,11 @@ impl ScalableBloomFilter {
     /// ```
     /// use probabilistic_collections::bloom::ScalableBloomFilter;
     ///
-    /// let mut filter = ScalableBloomFilter::new(100, 0.01, 2.0, 0.5);
-    /// assert!(filter.estimate_fpp() < 1e-6);
+    /// let mut filter = ScalableBloomFilter::<u32>::new(100, 0.01, 2.0, 0.5);
+    /// assert!(filter.estimate_fpp() < 1e-15);
     ///
     /// filter.insert(&0);
+    /// assert!(filter.estimate_fpp() > 1e-15);
     /// assert!(filter.estimate_fpp() < 0.01);
     /// ```
     pub fn estimate_fpp(&self) -> f64 {
@@ -244,17 +248,17 @@ mod tests {
 
     #[test]
     fn test_scalable_bloom_filter() {
-        let mut filter = ScalableBloomFilter::new(100, 0.01, 2.0, 0.5);
+        let mut filter = ScalableBloomFilter::<String>::new(100, 0.01, 2.0, 0.5);
 
-        assert!(!filter.contains(&"foo"));
-        filter.insert(&"foo");
-        assert!(filter.contains(&"foo"));
+        assert!(!filter.contains("foo"));
+        filter.insert("foo");
+        assert!(filter.contains("foo"));
         assert_eq!(filter.approximate_bits_used, 7);
         assert_eq!(filter.count_ones(), 7);
         assert_eq!(filter.count_zeros(), 93);
 
         filter.clear();
-        assert!(!filter.contains(&"foo"));
+        assert!(!filter.contains("foo"));
         assert_eq!(filter.approximate_bits_used, 0);
 
         assert_eq!(filter.len(), 100);
@@ -263,7 +267,7 @@ mod tests {
 
     #[test]
     fn test_grow() {
-        let mut filter = ScalableBloomFilter::new(100, 0.01, 2.0, 0.5);
+        let mut filter = ScalableBloomFilter::<u32>::new(100, 0.01, 2.0, 0.5);
 
         for i in 0..15 {
             filter.insert(&i);
@@ -277,8 +281,8 @@ mod tests {
 
     #[test]
     fn test_estimate_fpp() {
-        let mut filter = ScalableBloomFilter::new(700, 0.01, 2.0, 0.5);
-        assert!(filter.estimate_fpp() < 1e-6);
+        let mut filter = ScalableBloomFilter::<u32>::new(700, 0.01, 2.0, 0.5);
+        assert!(filter.estimate_fpp() < 1e-15);
 
         for item in 0..200 {
             filter.insert(&item);

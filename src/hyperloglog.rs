@@ -3,6 +3,7 @@
 
 use rand::{Rng, XorShiftRng};
 use siphasher::sip::SipHasher;
+use std::borrow::Borrow;
 use std::cmp;
 use std::f64;
 use std::hash::{Hash, Hasher};
@@ -22,7 +23,7 @@ use std::marker::PhantomData;
 /// # use std::f64::EPSILON;
 /// use probabilistic_collections::hyperloglog::HyperLogLog;
 ///
-/// let mut hhl = HyperLogLog::new(0.1);
+/// let mut hhl = HyperLogLog::<u32>::new(0.1);
 ///
 /// assert!(hhl.is_empty());
 ///
@@ -40,10 +41,7 @@ pub struct HyperLogLog<T> {
     _marker: PhantomData<T>,
 }
 
-impl<T> HyperLogLog<T>
-where
-    T: Hash,
-{
+impl<T> HyperLogLog<T> {
     fn get_hasher() -> SipHasher {
         let mut rng = XorShiftRng::new_unseeded();
         SipHasher::new_with_keys(rng.next_u64(), rng.next_u64())
@@ -68,7 +66,7 @@ where
     /// ```
     /// use probabilistic_collections::hyperloglog::HyperLogLog;
     ///
-    /// let hhl: HyperLogLog<u32> = HyperLogLog::new(0.1);
+    /// let hhl: HyperLogLog<u32> = HyperLogLog::<u32>::new(0.1);
     /// ```
     pub fn new(error_probability: f64) -> Self {
         assert!(0.0 < error_probability && error_probability < 1.0);
@@ -90,11 +88,15 @@ where
     /// ```
     /// use probabilistic_collections::hyperloglog::HyperLogLog;
     ///
-    /// let mut hhl = HyperLogLog::new(0.1);
+    /// let mut hhl = HyperLogLog::<u32>::new(0.1);
     ///
     /// hhl.insert(&0);
     /// ```
-    pub fn insert(&mut self, item: &T) {
+    pub fn insert<U>(&mut self, item: &U)
+    where
+        T: Borrow<U>,
+        U: Hash + ?Sized,
+    {
         let mut sip = self.hasher;
         item.hash(&mut sip);
         let hash = sip.finish();
@@ -113,11 +115,11 @@ where
     /// # use std::f64::EPSILON;
     /// use probabilistic_collections::hyperloglog::HyperLogLog;
     ///
-    /// let mut hhl1 = HyperLogLog::new(0.1);
+    /// let mut hhl1 = HyperLogLog::<u32>::new(0.1);
     /// hhl1.insert(&0);
     /// hhl1.insert(&1);
     ///
-    /// let mut hhl2 = HyperLogLog::new(0.1);
+    /// let mut hhl2 = HyperLogLog::<u32>::new(0.1);
     /// hhl2.insert(&0);
     /// hhl2.insert(&2);
     ///
@@ -145,7 +147,7 @@ where
     /// # use std::f64::EPSILON;
     /// use probabilistic_collections::hyperloglog::HyperLogLog;
     ///
-    /// let mut hhl = HyperLogLog::new(0.1);
+    /// let mut hhl = HyperLogLog::<u32>::new(0.1);
     /// assert!((hhl.len().round() - 0.0).abs() < EPSILON);
     ///
     /// hhl.insert(&1);
@@ -173,7 +175,7 @@ where
     /// # use std::f64::EPSILON;
     /// use probabilistic_collections::hyperloglog::HyperLogLog;
     ///
-    /// let mut hhl = HyperLogLog::new(0.1);
+    /// let mut hhl = HyperLogLog::<u32>::new(0.1);
     /// assert!(hhl.is_empty());
     ///
     /// hhl.insert(&1);
@@ -190,7 +192,7 @@ where
     /// # use std::f64::EPSILON;
     /// use probabilistic_collections::hyperloglog::HyperLogLog;
     ///
-    /// let mut hhl = HyperLogLog::new(0.1);
+    /// let mut hhl = HyperLogLog::<u32>::new(0.1);
     /// assert!(hhl.is_empty());
     ///
     /// hhl.insert(&1);
@@ -214,20 +216,20 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_panic_new_invalid_error_probability() {
-        let _hhl: HyperLogLog<u32> = HyperLogLog::new(0.0);
+        let _hhl: HyperLogLog<u32> = HyperLogLog::<u32>::new(0.0);
     }
 
     #[test]
     #[should_panic]
     fn test_panic_new_mismatch_error_iprobability() {
-        let mut hhl1: HyperLogLog<u32> = HyperLogLog::new(0.1);
-        let hhl2: HyperLogLog<u32> = HyperLogLog::new(0.2);
+        let mut hhl1: HyperLogLog<u32> = HyperLogLog::<u32>::new(0.1);
+        let hhl2: HyperLogLog<u32> = HyperLogLog::<u32>::new(0.2);
         hhl1.merge(&hhl2);
     }
 
     #[test]
     fn test_simple() {
-        let mut hhl = HyperLogLog::new(0.01);
+        let mut hhl = HyperLogLog::<u32>::new(0.01);
         assert!(hhl.is_empty());
         assert!(hhl.len() < EPSILON);
 
@@ -244,13 +246,13 @@ mod tests {
 
     #[test]
     fn test_merge() {
-        let mut hhl1 = HyperLogLog::new(0.01);
+        let mut hhl1 = HyperLogLog::<u32>::new(0.01);
 
         for key in &[0, 1, 2, 0, 1, 2] {
             hhl1.insert(&key);
         }
 
-        let mut hhl2 = HyperLogLog::new(0.01);
+        let mut hhl2 = HyperLogLog::<u32>::new(0.01);
 
         for key in &[0, 1, 3, 0, 1, 3] {
             hhl2.insert(&key);
