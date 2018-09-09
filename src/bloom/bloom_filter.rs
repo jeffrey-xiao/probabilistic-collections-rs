@@ -1,12 +1,12 @@
 use bit_vec::BitVec;
-use rand::{Rng, XorShiftRng};
 use serde::de::{self, Deserialize, Deserializer, MapAccess, SeqAccess, Visitor};
 use serde::ser::{Serialize, SerializeStruct, Serializer};
 use siphasher::sip::SipHasher;
 use std::borrow::Borrow;
 use std::fmt;
-use std::hash::{Hash, Hasher};
+use std::hash::Hash;
 use std::marker::PhantomData;
+use util;
 
 /// A space-efficient probabilistic data structure to test for membership in a set.
 ///
@@ -42,14 +42,6 @@ pub struct BloomFilter<T> {
 }
 
 impl<T> BloomFilter<T> {
-    fn get_hashers() -> [SipHasher; 2] {
-        let mut rng = XorShiftRng::new_unseeded();
-        [
-            SipHasher::new_with_keys(rng.next_u64(), rng.next_u64()),
-            SipHasher::new_with_keys(rng.next_u64(), rng.next_u64()),
-        ]
-    }
-
     fn get_hasher_count(bit_count: usize, item_count: usize) -> usize {
         ((bit_count as f64) / (item_count as f64) * 2f64.ln()).ceil() as usize
     }
@@ -67,7 +59,7 @@ impl<T> BloomFilter<T> {
         let bit_count = (-fpp.log2() * (item_count as f64) / 2f64.ln()).ceil() as usize;
         BloomFilter {
             bit_vec: BitVec::new(bit_count),
-            hashers: Self::get_hashers(),
+            hashers: util::get_hashers(),
             hasher_count: Self::get_hasher_count(bit_count, item_count),
             _marker: PhantomData,
         }
@@ -85,7 +77,7 @@ impl<T> BloomFilter<T> {
     pub fn from_item_count(bit_count: usize, item_count: usize) -> Self {
         BloomFilter {
             bit_vec: BitVec::new(bit_count),
-            hashers: Self::get_hashers(),
+            hashers: util::get_hashers(),
             hasher_count: Self::get_hasher_count(bit_count, item_count),
             _marker: PhantomData,
         }
@@ -104,24 +96,10 @@ impl<T> BloomFilter<T> {
         let item_count = -(2f64.ln() * (bit_count as f64) / fpp.log2()).floor() as usize;
         BloomFilter {
             bit_vec: BitVec::new(bit_count),
-            hashers: Self::get_hashers(),
+            hashers: util::get_hashers(),
             hasher_count: Self::get_hasher_count(bit_count, item_count),
             _marker: PhantomData,
         }
-    }
-
-    fn get_hashes<U>(&self, item: &U) -> [u64; 2]
-    where
-        T: Borrow<U>,
-        U: Hash + ?Sized,
-    {
-        let mut ret = [0; 2];
-        for (index, hash) in ret.iter_mut().enumerate() {
-            let mut sip = self.hashers[index];
-            item.hash(&mut sip);
-            *hash = sip.finish();
-        }
-        ret
     }
 
     /// Inserts an element into the bloom filter.
@@ -139,7 +117,7 @@ impl<T> BloomFilter<T> {
         T: Borrow<U>,
         U: Hash + ?Sized,
     {
-        let hashes = self.get_hashes(item);
+        let hashes = util::get_hashes::<T, U>(&self.hashers, item);
         for index in 0..self.hasher_count {
             let mut offset = (index as u64).wrapping_mul(hashes[1]) % 0xFFFF_FFFF_FFFF_FFC5;
             offset = hashes[0].wrapping_add(offset);
@@ -165,7 +143,7 @@ impl<T> BloomFilter<T> {
         T: Borrow<U>,
         U: Hash + ?Sized,
     {
-        let hashes = self.get_hashes(item);
+        let hashes = util::get_hashes::<T, U>(&self.hashers, item);
         (0..self.hasher_count).all(|index| {
             let mut offset = (index as u64).wrapping_mul(hashes[1]) % 0xFFFF_FFFF_FFFF_FFC5;
             offset = hashes[0].wrapping_add(offset);

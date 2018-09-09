@@ -3,8 +3,9 @@ use rand::{Rng, XorShiftRng};
 use siphasher::sip::SipHasher;
 use std::borrow::Borrow;
 use std::f64::consts;
-use std::hash::{Hash, Hasher};
+use std::hash::Hash;
 use std::marker::PhantomData;
+use util;
 
 const PRIME: u64 = 0xFFFF_FFFF_FFFF_FFC5;
 
@@ -70,20 +71,6 @@ impl<T> BSBloomFilter<T> {
         }
     }
 
-    fn get_hashes<U>(&self, item: &U) -> [u64; 2]
-    where
-        T: Borrow<U>,
-        U: Hash + ?Sized,
-    {
-        let mut ret = [0; 2];
-        for (index, hash) in ret.iter_mut().enumerate() {
-            let mut sip = self.hashers[index];
-            item.hash(&mut sip);
-            *hash = sip.finish();
-        }
-        ret
-    }
-
     /// Inserts an element into the bloom filter and returns if it is distinct
     ///
     /// # Examples
@@ -99,7 +86,7 @@ impl<T> BSBloomFilter<T> {
         T: Borrow<U>,
         U: Hash + ?Sized,
     {
-        let hashes = self.get_hashes(item);
+        let hashes = util::get_hashes::<T, U>(&self.hashers, item);
         if !self.contains_hashes(hashes) {
             let bit_count = self.bit_count();
 
@@ -136,7 +123,7 @@ impl<T> BSBloomFilter<T> {
         T: Borrow<U>,
         U: Hash + ?Sized,
     {
-        let hashes = self.get_hashes(item);
+        let hashes = util::get_hashes::<T, U>(&self.hashers, item);
         self.contains_hashes(hashes)
     }
 
@@ -316,20 +303,6 @@ impl<T> BSSDBloomFilter<T> {
         }
     }
 
-    fn get_hashes<U>(&self, item: &U) -> [u64; 2]
-    where
-        T: Borrow<U>,
-        U: Hash + ?Sized,
-    {
-        let mut ret = [0; 2];
-        for (index, hash) in ret.iter_mut().enumerate() {
-            let mut sip = self.hashers[index];
-            item.hash(&mut sip);
-            *hash = sip.finish();
-        }
-        ret
-    }
-
     /// Inserts an element into the bloom filter and returns if it is distinct
     ///
     /// # Examples
@@ -346,7 +319,7 @@ impl<T> BSSDBloomFilter<T> {
         U: Hash + ?Sized,
     {
         if !self.contains(item) {
-            let hashes = self.get_hashes(item);
+            let hashes = util::get_hashes::<T, U>(&self.hashers, item);
             let bit_count = self.bit_count();
 
             let filter_index = self.rng.gen_range(0, self.hasher_count);
@@ -382,7 +355,7 @@ impl<T> BSSDBloomFilter<T> {
         T: Borrow<U>,
         U: Hash + ?Sized,
     {
-        let hashes = self.get_hashes(item);
+        let hashes = util::get_hashes::<T, U>(&self.hashers, item);
         (0..self.hasher_count).all(|index| {
             let mut offset = (index as u64).wrapping_mul(hashes[1]) % PRIME;
             offset = hashes[0].wrapping_add(offset);
@@ -558,20 +531,6 @@ impl<T> RLBSBloomFilter<T> {
         }
     }
 
-    fn get_hashes<U>(&self, item: &U) -> [u64; 2]
-    where
-        T: Borrow<U>,
-        U: Hash + ?Sized,
-    {
-        let mut ret = [0; 2];
-        for (index, hash) in ret.iter_mut().enumerate() {
-            let mut sip = self.hashers[index];
-            item.hash(&mut sip);
-            *hash = sip.finish();
-        }
-        ret
-    }
-
     /// Inserts an element into the bloom filter and returns if it is distinct
     ///
     /// # Examples
@@ -588,7 +547,7 @@ impl<T> RLBSBloomFilter<T> {
         U: Hash + ?Sized,
     {
         if !self.contains(item) {
-            let hashes = self.get_hashes(item);
+            let hashes = util::get_hashes::<T, U>(&self.hashers, item);
             let bit_count = self.bit_count();
 
             (0..self.hasher_count).for_each(|filter_index| {
@@ -626,7 +585,7 @@ impl<T> RLBSBloomFilter<T> {
         T: Borrow<U>,
         U: Hash + ?Sized,
     {
-        let hashes = self.get_hashes(item);
+        let hashes = util::get_hashes::<T, U>(&self.hashers, item);
         (0..self.hasher_count).all(|filter_index| {
             let mut offset = (filter_index as u64).wrapping_mul(hashes[1]) % PRIME;
             offset = hashes[0].wrapping_add(offset);

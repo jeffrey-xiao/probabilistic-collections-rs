@@ -6,6 +6,7 @@ use std::borrow::Borrow;
 use std::cmp;
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
+use util;
 
 /// A space-efficient probabilistic data structure to test for membership in a set. Cuckoo filters
 /// also provide the flexibility to remove items.
@@ -42,14 +43,6 @@ pub struct CuckooFilter<T> {
 }
 
 impl<T> CuckooFilter<T> {
-    fn get_hashers() -> [SipHasher; 2] {
-        let mut rng = XorShiftRng::new_unseeded();
-        [
-            SipHasher::new_with_keys(rng.next_u64(), rng.next_u64()),
-            SipHasher::new_with_keys(rng.next_u64(), rng.next_u64()),
-        ]
-    }
-
     /// Constructs a new, empty `CuckooFilter` with an estimated max capacity of `item_count`. By
     /// default, the cuckoo filter will have 8 bits per item fingerprint, 4 entries per index, and
     /// a maximum of 512 item displacements before terminating the insertion process. The cuckoo
@@ -77,7 +70,7 @@ impl<T> CuckooFilter<T> {
                 bucket_len * DEFAULT_ENTRIES_PER_INDEX,
             ),
             extra_items: Vec::new(),
-            hashers: Self::get_hashers(),
+            hashers: util::get_hashers(),
             _marker: PhantomData,
         }
     }
@@ -119,7 +112,7 @@ impl<T> CuckooFilter<T> {
                 bucket_len * entries_per_index,
             ),
             extra_items: Vec::new(),
-            hashers: Self::get_hashers(),
+            hashers: util::get_hashers(),
             _marker: PhantomData,
         }
     }
@@ -152,7 +145,7 @@ impl<T> CuckooFilter<T> {
                 bucket_len * entries_per_index,
             ),
             extra_items: Vec::new(),
-            hashers: Self::get_hashers(),
+            hashers: util::get_hashers(),
             _marker: PhantomData,
         }
     }
@@ -193,23 +186,9 @@ impl<T> CuckooFilter<T> {
                 bucket_len * entries_per_index,
             ),
             extra_items: Vec::new(),
-            hashers: Self::get_hashers(),
+            hashers: util::get_hashers(),
             _marker: PhantomData,
         }
-    }
-
-    fn get_hashes<U>(&self, item: &U) -> [u64; 2]
-    where
-        T: Borrow<U>,
-        U: Hash + ?Sized,
-    {
-        let mut ret = [0; 2];
-        for (index, hash) in ret.iter_mut().enumerate() {
-            let mut sip = self.hashers[index];
-            item.hash(&mut sip);
-            *hash = sip.finish();
-        }
-        ret
     }
 
     pub(super) fn get_fingerprint(raw_fingerprint: u64) -> Vec<u8> {
@@ -264,7 +243,7 @@ impl<T> CuckooFilter<T> {
         T: Borrow<U>,
         U: Hash + ?Sized,
     {
-        let hashes = self.get_hashes(item);
+        let hashes = util::get_hashes::<T, U>(&self.hashers, item);
         let (mut fingerprint, index_1, index_2) = self.get_fingerprint_and_indexes(hashes);
         if !self.contains_fingerprint(&fingerprint, index_1, index_2) {
             if self.insert_fingerprint(fingerprint.as_slice(), index_1) || self.insert_fingerprint(fingerprint.as_slice(), index_2) {
@@ -331,7 +310,7 @@ impl<T> CuckooFilter<T> {
         T: Borrow<U>,
         U: Hash + ?Sized,
     {
-        let hashes = self.get_hashes(item);
+        let hashes = util::get_hashes::<T, U>(&self.hashers, item);
         let (fingerprint, index_1, index_2) = self.get_fingerprint_and_indexes(hashes);
         self.remove_fingerprint(&fingerprint, index_1, index_2)
     }
@@ -371,7 +350,8 @@ impl<T> CuckooFilter<T> {
         T: Borrow<U>,
         U: Hash + ?Sized,
     {
-        let (fingerprint, index_1, index_2) = self.get_fingerprint_and_indexes(self.get_hashes(item));
+        let hashes = util::get_hashes::<T, U>(&self.hashers, item);
+        let (fingerprint, index_1, index_2) = self.get_fingerprint_and_indexes(hashes);
         self.contains_fingerprint(&fingerprint, index_1, index_2)
     }
 

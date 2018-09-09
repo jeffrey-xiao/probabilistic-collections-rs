@@ -1,10 +1,10 @@
 //! Space-efficient probabilistic data structure for estimating the number of item occurrences.
 
-use rand::{Rng, XorShiftRng};
 use siphasher::sip::SipHasher;
 use std::borrow::Borrow;
-use std::hash::{Hash, Hasher};
+use std::hash::Hash;
 use std::marker::PhantomData;
+use util;
 
 /// Trait for types that have the logic for estimating the number of item occurrences.
 pub trait CountStrategy {
@@ -96,14 +96,6 @@ pub struct CountMinSketch<T, U> {
 }
 
 impl<T, U> CountMinSketch<T, U> {
-    fn get_hashers() -> [SipHasher; 2] {
-        let mut rng = XorShiftRng::new_unseeded();
-        [
-            SipHasher::new_with_keys(rng.next_u64(), rng.next_u64()),
-            SipHasher::new_with_keys(rng.next_u64(), rng.next_u64()),
-        ]
-    }
-
     /// Constructs a new, empty `CountMinSketch` with a specific number of rows and columns.
     ///
     /// # Examples
@@ -121,7 +113,7 @@ impl<T, U> CountMinSketch<T, U> {
             cols,
             items: 0,
             grid: vec![0; rows * cols],
-            hashers: Self::get_hashers(),
+            hashers: util::get_hashers(),
             _marker: PhantomData,
         }
     }
@@ -146,23 +138,9 @@ impl<T, U> CountMinSketch<T, U> {
             cols,
             items: 0,
             grid: vec![0; rows * cols],
-            hashers: Self::get_hashers(),
+            hashers: util::get_hashers(),
             _marker: PhantomData,
         }
-    }
-
-    fn get_hashes<V>(&self, item: &V) -> [u64; 2]
-    where
-        U: Borrow<V>,
-        V: Hash + ?Sized,
-    {
-        let mut ret = [0; 2];
-        for (index, hash) in ret.iter_mut().enumerate() {
-            let mut sip = self.hashers[index];
-            item.hash(&mut sip);
-            *hash = sip.finish();
-        }
-        ret
     }
 
     /// Inserts an element into the count-min sketch `value` times.
@@ -181,7 +159,7 @@ impl<T, U> CountMinSketch<T, U> {
         V: Hash + ?Sized,
     {
         self.items += value;
-        let hashes = self.get_hashes(item);
+        let hashes = util::get_hashes::<U, V>(&self.hashers, item);
         for row in 0..self.rows {
             let mut offset = (row as u64).wrapping_mul(hashes[1]) % 0xFFFF_FFFF_FFFF_FFC5;
             offset = hashes[0].wrapping_add(offset);
@@ -229,7 +207,7 @@ impl<T, U> CountMinSketch<T, U> {
             row: 0,
             rows: self.rows,
             cols: self.cols,
-            hashes: self.get_hashes(item),
+            hashes: util::get_hashes::<U, V>(&self.hashers, item),
             grid: &self.grid,
         };
         T::get_estimate(self.items, self.rows, self.cols, iter)

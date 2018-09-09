@@ -1,9 +1,9 @@
 use bit_vec::BitVec;
-use rand::{Rng, XorShiftRng};
 use siphasher::sip::SipHasher;
 use std::borrow::Borrow;
-use std::hash::{Hash, Hasher};
+use std::hash::Hash;
 use std::marker::PhantomData;
+use util;
 
 /// A space-efficient probabilistic data structure to test for membership in a set.
 ///
@@ -38,14 +38,6 @@ pub struct PartitionedBloomFilter<T> {
 }
 
 impl<T> PartitionedBloomFilter<T> {
-    fn get_hashers() -> [SipHasher; 2] {
-        let mut rng = XorShiftRng::new_unseeded();
-        [
-            SipHasher::new_with_keys(rng.next_u64(), rng.next_u64()),
-            SipHasher::new_with_keys(rng.next_u64(), rng.next_u64()),
-        ]
-    }
-
     fn get_hasher_count(fpp: f64) -> usize {
         (1.0 / fpp).log2().ceil() as usize
     }
@@ -64,7 +56,7 @@ impl<T> PartitionedBloomFilter<T> {
         let bit_count = (item_count as f64 * fpp.ln() / -2f64.ln().powi(2) / (hasher_count as f64)).ceil() as usize;
         PartitionedBloomFilter {
             bit_vec: BitVec::new(bit_count * hasher_count),
-            hashers: Self::get_hashers(),
+            hashers: util::get_hashers(),
             bit_count,
             hasher_count,
             _marker: PhantomData,
@@ -84,25 +76,11 @@ impl<T> PartitionedBloomFilter<T> {
         let hasher_count = Self::get_hasher_count(fpp);
         PartitionedBloomFilter {
             bit_vec: BitVec::new(bit_count * hasher_count),
-            hashers: Self::get_hashers(),
+            hashers: util::get_hashers(),
             bit_count,
             hasher_count,
             _marker: PhantomData,
         }
-    }
-
-    fn get_hashes<U>(&self, item: &U) -> [u64; 2]
-    where
-        T: Borrow<U>,
-        U: Hash + ?Sized,
-    {
-        let mut ret = [0; 2];
-        for (index, hash) in ret.iter_mut().enumerate() {
-            let mut sip = self.hashers[index];
-            item.hash(&mut sip);
-            *hash = sip.finish();
-        }
-        ret
     }
 
     /// Inserts an element into the bloom filter.
@@ -120,7 +98,7 @@ impl<T> PartitionedBloomFilter<T> {
         T: Borrow<U>,
         U: Hash + ?Sized,
     {
-        let hashes = self.get_hashes(item);
+        let hashes = util::get_hashes::<T, U>(&self.hashers, item);
         for index in 0..self.hasher_count {
             let mut offset = (index as u64).wrapping_mul(hashes[1]) % 0xFFFF_FFFF_FFFF_FFC5;
             offset = hashes[0].wrapping_add(offset);
@@ -147,7 +125,7 @@ impl<T> PartitionedBloomFilter<T> {
         T: Borrow<U>,
         U: Hash + ?Sized,
     {
-        let hashes = self.get_hashes(item);
+        let hashes = util::get_hashes::<T, U>(&self.hashers, item);
         (0..self.hasher_count).all(|index| {
             let mut offset = (index as u64).wrapping_mul(hashes[1]) % 0xFFFF_FFFF_FFFF_FFC5;
             offset = hashes[0].wrapping_add(offset);
