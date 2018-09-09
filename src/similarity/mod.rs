@@ -1,3 +1,5 @@
+//! Module for measuring similarities between sets.
+
 mod min_hash;
 mod sim_hash;
 
@@ -8,6 +10,21 @@ use std::collections::HashSet;
 use std::hash::Hash;
 use std::iter::FromIterator;
 
+/// A w-shingle iterator for an list of items.
+///
+/// # Examples
+/// ```
+/// use probabilistic_collections::similarity::ShingleIterator;
+///
+/// let mut shingle_iter = ShingleIterator::new(2, "the cat sat on a mat".split(' ').collect());
+///
+/// assert_eq!(shingle_iter.next(), Some(vec!["the", "cat"]));
+/// assert_eq!(shingle_iter.next(), Some(vec!["cat", "sat"]));
+/// assert_eq!(shingle_iter.next(), Some(vec!["sat", "on"]));
+/// assert_eq!(shingle_iter.next(), Some(vec!["on", "a"]));
+/// assert_eq!(shingle_iter.next(), Some(vec!["a", "mat"]));
+/// assert_eq!(shingle_iter.next(), None);
+/// ```
 pub struct ShingleIterator<'a, T>
 where
     T: 'a + ?Sized,
@@ -21,6 +38,15 @@ impl<'a, T> ShingleIterator<'a, T>
 where
     T: ?Sized
 {
+    /// Constructs a new `ShingleIterator` that contains shingles of `token_count` tokens from
+    /// `tokens`.
+    ///
+    /// # Examples
+    /// ```
+    /// use probabilistic_collections::similarity::ShingleIterator;
+    ///
+    /// let mut shingle_iter = ShingleIterator::new(2, "the cat sat on a mat".split(' ').collect());
+    /// ```
     pub fn new(token_count: usize, tokens: Vec<&'a T>) -> Self {
         ShingleIterator {
             token_count,
@@ -45,29 +71,44 @@ where
     }
 }
 
-pub fn get_jacard_similarity<T, U>(shingles_1: T, shingles_2: T) -> f64
+/// Computes the Jaccard Similarity between two iterators. The Jaccard Similarity is the quotient
+/// between the intersection and the union.
+///
+/// # Examples
+/// ```
+/// use probabilistic_collections::similarity::{get_jaccard_similarity, ShingleIterator};
+///
+/// assert_eq!(
+///     get_jaccard_similarity(
+///         ShingleIterator::new(2, "the cat sat on a mat".split(' ').collect()),
+///         ShingleIterator::new(2, "the cat sat on the mat".split(' ').collect()),
+///     ),
+///     3.0 / 7.0,
+/// );
+/// ```
+pub fn get_jaccard_similarity<T, U>(iter_1: T, iter_2: T) -> f64
 where
     T: Iterator<Item=U>,
     U: Hash + Eq,
 {
-    let h1 = HashSet::<U>::from_iter(shingles_1);
-    let h2 = HashSet::<U>::from_iter(shingles_2);
+    let h1 = HashSet::<U>::from_iter(iter_1);
+    let h2 = HashSet::<U>::from_iter(iter_2);
 
     return (h1.intersection(&h2).count() as f64) / (h1.union(&h2).count() as f64);
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{get_jacard_similarity, ShingleIterator};
+    use super::{get_jaccard_similarity, ShingleIterator};
     static S1: &'static str = "the cat sat on a mat";
     static S2: &'static str = "the cat sat on the mat";
     static S3: &'static str = "we all scream for ice cream";
 
 
     #[test]
-    fn test_jacard_similarity() {
+    fn test_jaccard_similarity() {
         assert_eq!(
-            get_jacard_similarity(
+            get_jaccard_similarity(
                 ShingleIterator::new(2, S1.split(' ').collect()),
                 ShingleIterator::new(2, S2.split(' ').collect()),
             ),
@@ -75,7 +116,7 @@ mod tests {
         );
 
         assert_eq!(
-            get_jacard_similarity(
+            get_jaccard_similarity(
                 ShingleIterator::new(2, S1.split(' ').collect()),
                 ShingleIterator::new(2, S3.split(' ').collect()),
             ),

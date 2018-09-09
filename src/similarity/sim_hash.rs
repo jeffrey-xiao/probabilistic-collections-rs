@@ -6,12 +6,40 @@ use std::hash::{Hash, Hasher};
 use std::iter::FromIterator;
 use std::marker::PhantomData;
 
+/// `SimHash` is a locality sensitive hashing scheme. If two sets `s1` and `s2` are similar,
+/// `SimHash` will generate hashes for `s1` and `s2` that has a small Hamming Distance between
+/// them.
+///
+/// # Examples
+/// ```
+/// use probabilistic_collections::similarity::{ShingleIterator, SimHash};
+///
+/// let sim_hash = SimHash::new();
+///
+/// assert_eq!(
+///     sim_hash.get_sim_hash(ShingleIterator::new(2, "the cat sat on a mat".split(' ').collect())),
+///     0b1111011011001001011100000010010110011011101011110110000010001001,
+/// );
+/// assert_eq!(
+///     sim_hash.get_sim_hash(ShingleIterator::new(2, "the cat sat on the mat".split(' ').collect())),
+///     0b0111011001000001011110000011011010011011101001100101101000000001,
+/// );
+/// ```
 pub struct SimHash<T, U> {
     hasher: SipHasher,
     _marker: PhantomData<(T, U)>,
 }
 
 impl<T, U> SimHash<T, U> {
+
+    /// Constructs a new `SimHash`,
+    ///
+    /// # Examples
+    /// ```
+    /// use probabilistic_collections::similarity::{ShingleIterator, SimHash};
+    ///
+    /// let sim_hash = SimHash::<ShingleIterator<&str>, &str>::new();
+    /// ```
     pub fn new() -> Self {
         let mut rng = XorShiftRng::new_unseeded();
         SimHash {
@@ -29,13 +57,26 @@ impl<T, U> SimHash<T, U> {
         sip.finish()
     }
 
-    pub fn get_sim_hash(&self, s: T) -> u64
+    /// Returns the hash associated with iterator `iter`.
+    ///
+    /// # Examples
+    /// ```
+    /// use probabilistic_collections::similarity::{ShingleIterator, SimHash};
+    ///
+    /// let sim_hash = SimHash::new();
+    ///
+    /// assert_eq!(
+    ///     sim_hash.get_sim_hash(ShingleIterator::new(2, "the cat sat on a mat".split(' ').collect())),
+    ///     0b1111011011001001011100000010010110011011101011110110000010001001,
+    /// );
+    /// ```
+    pub fn get_sim_hash(&self, iter: T) -> u64
     where
         T: Iterator<Item=U>,
         U: Hash,
     {
         let mut counts = [0i64; 64];
-        for hash in s.map(|item| self.get_hash(&item)) {
+        for hash in iter.map(|item| self.get_hash(&item)) {
             for i in 0..64 {
                 if (hash >> i) & 1 == 0 {
                     counts[i] += 1;
@@ -54,17 +95,35 @@ impl<T, U> SimHash<T, U> {
         })
     }
 
+    /// Returns all pairs of indexes corresponding to iterators in `iter_vec` that could be similar
+    /// based on `window_size`.
+    ///
+    /// # Examples
+    /// ```
+    /// use probabilistic_collections::similarity::{ShingleIterator, SimHash};
+    ///
+    /// let sim_hash = SimHash::new();
+    ///
+    /// sim_hash.report_similarities(
+    ///     2,
+    ///     vec![
+    ///         ShingleIterator::new(2, "the cat sat on a mat".split(' ').collect()),
+    ///         ShingleIterator::new(2, "the cat sat on the mat".split(' ').collect()),
+    ///         ShingleIterator::new(2, "we all scream for ice cream".split(' ').collect()),
+    ///     ],
+    /// );
+    /// ```
     pub fn report_similarities(
         &self,
         window_size: usize,
-        shingles_vec: Vec<T>,
+        iter_vec: Vec<T>,
     ) -> Vec<(usize, usize)>
     where
         T: Iterator<Item=U>,
         U: Hash,
     {
         assert!(window_size > 1);
-        let mut sim_hashes: Vec<_> = shingles_vec
+        let mut sim_hashes: Vec<_> = iter_vec
             .into_iter()
             .enumerate()
             .map(|(index, shingles)| (self.get_sim_hash(shingles), index))
@@ -84,11 +143,53 @@ impl<T, U> SimHash<T, U> {
                     }
                 }
             }
+
             for sim_hash in &mut sim_hashes {
                 sim_hash.0.rotate_left(1);
             }
         }
 
         Vec::from_iter(similarities.into_iter())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SimHash;
+    use similarity::ShingleIterator;
+
+    static S1: &'static str = "the cat sat on a mat";
+    static S2: &'static str = "the cat sat on the mat";
+    static S3: &'static str = "we all scream for ice cream";
+
+
+    #[test]
+    fn test_sim_hash() {
+        let sim_hash = SimHash::new();
+
+        assert_eq!(
+            sim_hash.get_sim_hash(ShingleIterator::new(2, S1.split(' ').collect())),
+            0b1111011011001001011100000010010110011011101011110110000010001001,
+        );
+        assert_eq!(
+            sim_hash.get_sim_hash(ShingleIterator::new(2, S2.split(' ').collect())),
+            0b0111011001000001011110000011011010011011101001100101101000000001,
+        );
+        assert_eq!(
+            sim_hash.get_sim_hash(ShingleIterator::new(2, S3.split(' ').collect())),
+            0b11100101100111101010111000110101100011100100100001101000000000,
+        );
+
+        let similarities = sim_hash.report_similarities(
+            2,
+            vec![
+                ShingleIterator::new(2, "the cat sat on a mat".split(' ').collect()),
+                ShingleIterator::new(2, "the cat sat on the mat".split(' ').collect()),
+                ShingleIterator::new(2, "we all scream for ice cream".split(' ').collect()),
+            ],
+        );
+
+        assert!(similarities.contains(&(0, 1)));
+        assert!(similarities.contains(&(1, 2)));
     }
 }
