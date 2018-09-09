@@ -228,6 +228,7 @@ impl<T, U> CountMinSketch<T, U> {
         for value in &mut self.grid {
             *value = 0
         }
+        self.items = 0;
     }
 
     /// Returns the number of rows in the count-min sketch.
@@ -312,66 +313,63 @@ impl<'a> Iterator for ItemValueIter<'a> {
 
 #[cfg(test)]
 mod tests {
-    use super::{CountMinSketch, CountMeanStrategy, CountMedianBiasStrategy, CountMinStrategy};
 
-    #[test]
-    fn test_new() {
-        let count_min_sketch = CountMinSketch::<CountMinStrategy, String>::new(3, 28);
+    macro_rules! count_min_sketch_tests {
+        ($($name:ident: $strategy_name:ident,)*) => {
+            $(
+                mod $name {
+                    use super::super::{CountMinSketch, $strategy_name};
 
-        assert_eq!(count_min_sketch.cols(), 28);
-        assert_eq!(count_min_sketch.rows(), 3);
-        assert!(count_min_sketch.confidence() <= 0.1);
-        assert!(count_min_sketch.error() <= 0.05);
+                    #[test]
+                    fn test_new() {
+                        let count_min_sketch = CountMinSketch::<$strategy_name, String>::new(3, 28);
+
+                        assert_eq!(count_min_sketch.cols(), 28);
+                        assert_eq!(count_min_sketch.rows(), 3);
+                        assert!(count_min_sketch.confidence() <= 0.1);
+                        assert!(count_min_sketch.error() <= 0.05);
+                    }
+
+                    #[test]
+                    fn test_from_error() {
+                        let count_min_sketch = CountMinSketch::<$strategy_name, String>::from_error(0.1, 0.05);
+
+                        assert_eq!(count_min_sketch.cols(), 28);
+                        assert_eq!(count_min_sketch.rows(), 3);
+                        assert!(count_min_sketch.confidence() <= 0.1);
+                        assert!(count_min_sketch.error() <= 0.05);
+                    }
+
+                    #[test]
+                    fn test_add() {
+                        let mut count_min_sketch = CountMinSketch::<$strategy_name, String>::from_error(0.1, 0.05);
+                        count_min_sketch.add("foo", 3);
+                        assert_eq!(count_min_sketch.count("foo"), 3);
+                    }
+
+                    #[test]
+                    fn test_remove() {
+                        let mut count_min_sketch = CountMinSketch::<$strategy_name, String>::from_error(0.1, 0.05);
+                        count_min_sketch.add("foo", 3);
+                        count_min_sketch.remove("foo", 3);
+                        assert_eq!(count_min_sketch.count("foo"), 0);
+                    }
+
+                    #[test]
+                    fn test_clear() {
+                        let mut count_min_sketch = CountMinSketch::<$strategy_name, String>::from_error(0.1, 0.05);
+                        count_min_sketch.add("foo", 3);
+                        count_min_sketch.clear();
+                        assert_eq!(count_min_sketch.count("foo"), 0);
+                    }
+                }
+            )*
+        }
     }
 
-    #[test]
-    fn test_from_error() {
-        let count_min_sketch = CountMinSketch::<CountMinStrategy, String>::from_error(0.1, 0.05);
-
-        assert_eq!(count_min_sketch.cols(), 28);
-        assert_eq!(count_min_sketch.rows(), 3);
-        assert!(count_min_sketch.confidence() <= 0.1);
-        assert!(count_min_sketch.error() <= 0.05);
-    }
-
-    #[test]
-    fn test_add() {
-        let mut count_min_sketch = CountMinSketch::<CountMinStrategy, String>::from_error(0.1, 0.05);
-        count_min_sketch.add("foo", 3);
-        assert_eq!(count_min_sketch.count("foo"), 3);
-
-        let mut count_min_sketch = CountMinSketch::<CountMeanStrategy, String>::from_error(0.1, 0.05);
-        count_min_sketch.add("foo", 3);
-        assert_eq!(count_min_sketch.count("foo"), 3);
-
-        let mut count_min_sketch = CountMinSketch::<CountMedianBiasStrategy, String>::from_error(0.1, 0.05);
-        count_min_sketch.add("foo", 3);
-        assert_eq!(count_min_sketch.count("foo"), 3);
-    }
-
-    #[test]
-    fn test_remove() {
-        let mut count_min_sketch = CountMinSketch::<CountMinStrategy, String>::from_error(0.1, 0.05);
-        count_min_sketch.add("foo", 3);
-        count_min_sketch.remove("foo", 3);
-        assert_eq!(count_min_sketch.count("foo"), 0);
-
-        let mut count_min_sketch = CountMinSketch::<CountMeanStrategy, String>::from_error(0.1, 0.05);
-        count_min_sketch.add("foo", 3);
-        count_min_sketch.remove("foo", 3);
-        assert_eq!(count_min_sketch.count("foo"), 0);
-
-        let mut count_min_sketch = CountMinSketch::<CountMedianBiasStrategy, String>::from_error(0.1, 0.05);
-        count_min_sketch.add("foo", 3);
-        count_min_sketch.remove("foo", 3);
-        assert_eq!(count_min_sketch.count("foo"), 0);
-    }
-
-    #[test]
-    fn test_clear() {
-        let mut count_min_sketch = CountMinSketch::<CountMinStrategy, String>::from_error(0.1, 0.05);
-        count_min_sketch.add("foo", 3);
-        count_min_sketch.clear();
-        assert_eq!(count_min_sketch.count("foo"), 0);
-    }
+    count_min_sketch_tests!(
+        count_min_strategy: CountMinStrategy,
+        count_mean_strategy: CountMeanStrategy,
+        count_median_bias_strategy: CountMedianBiasStrategy,
+    );
 }
