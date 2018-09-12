@@ -313,7 +313,6 @@ impl<'a> Iterator for ItemValueIter<'a> {
 
 #[cfg(test)]
 mod tests {
-
     macro_rules! count_min_sketch_tests {
         ($($name:ident: $strategy_name:ident,)*) => {
             $(

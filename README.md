@@ -40,3 +40,9 @@ extern crate probabilistic_collections;
  > Sood, Sadhan, and Dmitri Loguinov. 2011. "Probabilistic Near-Duplicate Detection Using Simhash." In *Proceedings of the 20th Acm International Conference on Information and Knowledge Management*, 1117--26. CIKM '11. New York, NY, USA: ACM. <https://doi.org/10.1145/2063576.2063737>.
  - [Scalable Bloom Filters](https://dl.acm.org/citation.cfm?id=1224501)
  > Almeida, Paulo Sérgio, Carlos Baquero, Nuno Preguiça, and David Hutchison. 2007. "Scalable Bloom Filters." *Inf. Process. Lett.* 101 (6). Amsterdam, The Netherlands, The Netherlands: Elsevier North-Holland, Inc.: 255--61. <https://doi.org/10.1016/j.ipl.2006.10.007>.
+
+## License
+`probabilistic-collections-rs` is dual-licensed under the terms of either the MIT license or the
+Apache License (Version 2.0).
+
+See [LICENSE-APACHE](LICENSE-APACHE) and [LICENSE-MIT](LICENSE-MIT) for more details.

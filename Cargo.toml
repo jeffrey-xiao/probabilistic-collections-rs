@@ -2,15 +2,16 @@
 name = "probabilistic-collections"
 version = "0.4.0"
 authors = ["Jeffrey Xiao <jeffrey.xiao1998@gmail.com>"]
-license = "MIT"
+license = "MIT OR Apache-2.0"
 readme = "README.md"
 repository = "https://gitlab.com/jeffrey-xiao/probabilistic-collections-rs"
 documentation = "https://docs.rs/probabilistic-collections"
 description = """
-An extension to the collections in the standard library with various data structures.
+Various implementations of collections that use randomization to improve on running time or memory,
+but introduce a certain amount of error
 """
 categories = ["algorithms", "data-structures"]
-keywords = ["collections", "data-structures"]
+keywords = ["collections", "data-structures", "probabilistic"]
 include = ["src/**/*", "Cargo.toml"]
 
 [badges]
