@@ -1,4 +1,5 @@
 # probabilistic-collections-rs
+
 [![probabilistic-collections](http://meritbadge.herokuapp.com/probabilistic-collections)](https://crates.io/crates/probabilistic-collections)
 [![Documentation](https://docs.rs/probabilistic-collections/badge.svg)](https://docs.rs/probabilistic-collections)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -11,6 +12,7 @@ controlled under a certain threshold which makes these data structures extremely
 and streaming applications.
 
 ## Usage
+
 Add this to your `Cargo.toml`:
 ```toml
 [dependencies]
@@ -22,6 +24,7 @@ extern crate probabilistic_collections;
 ```
 
 ## References
+
  - [Advanced Bloom Filter Based Algorithms for Efficient Approximate Data De-Duplication in Streams](https://arxiv.org/abs/1212.3964)
  > Bera, Suman K., Sourav Dutta, Ankur Narang, and Souvik Bhattacherjee. 2012. "Advanced Bloom Filter Based Algorithms for Efficient Approximate Data de-Duplication in Streams." *CoRR* abs/1212.3964. <http://arxiv.org/abs/1212.3964>.
  - [An improved data stream summary: the count-min sketch and its applications](https://dl.acm.org/citation.cfm?id=1073718)
@@ -42,6 +45,7 @@ extern crate probabilistic_collections;
  > Almeida, Paulo Sérgio, Carlos Baquero, Nuno Preguiça, and David Hutchison. 2007. "Scalable Bloom Filters." *Inf. Process. Lett.* 101 (6). Amsterdam, The Netherlands, The Netherlands: Elsevier North-Holland, Inc.: 255--61. <https://doi.org/10.1016/j.ipl.2006.10.007>.
 
 ## License
+
 `probabilistic-collections-rs` is dual-licensed under the terms of either the MIT license or the
 Apache License (Version 2.0).
 
