@@ -27,6 +27,7 @@ addons:
       - libiberty-dev
 
 before_script:
+  - rustup install nightly
   - rustup component add rustfmt-preview
 
 script:
