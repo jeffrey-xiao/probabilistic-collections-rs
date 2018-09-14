@@ -28,7 +28,7 @@ addons:
 
 before_script:
   - rustup install nightly
-  - rustup component add rustfmt-preview
+  - rustup component add rustfmt-preview --toolchain nightly
 
 script:
   - cargo +nightly fmt --verbose --all -- --check
