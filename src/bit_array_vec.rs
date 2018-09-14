@@ -1,6 +1,7 @@
 //! Growable list of bit arrays.
 
 use std::cmp;
+use std::iter;
 use std::mem;
 use std::ops::Range;
 
@@ -10,6 +11,7 @@ use std::ops::Range;
 /// memory efficient for small bit arrays for a small time tradeoff.
 ///
 /// # Examples
+///
 /// ```
 /// use probabilistic_collections::bit_array_vec::BitArrayVec;
 ///
@@ -48,6 +50,7 @@ impl BitArrayVec {
     /// initialized to all zeros.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bit_array_vec::BitArrayVec;
     ///
@@ -70,6 +73,7 @@ impl BitArrayVec {
     /// initialized to `bytes`.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bit_array_vec::BitArrayVec;
     ///
@@ -95,6 +99,7 @@ impl BitArrayVec {
     /// Constructs a new, empty `BitArrayVec` with a certain capacity.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bit_array_vec::BitArrayVec;
     ///
@@ -112,9 +117,11 @@ impl BitArrayVec {
     /// Sets the value at index `index` to `bytes`.
     ///
     /// # Panics
+    ///
     /// Panics if attempt to set an index out-of-bounds.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bit_array_vec::BitArrayVec;
     ///
@@ -168,9 +175,11 @@ impl BitArrayVec {
     /// Returns the value at index `index`.
     ///
     /// # Panics
+    ///
     /// Panics if attempt to get an index out-of-bounds.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bit_array_vec::BitArrayVec;
     ///
@@ -214,16 +223,14 @@ impl BitArrayVec {
     /// Truncates a `BitArrayVec`, dropping excess elements.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bit_array_vec::BitArrayVec;
     ///
     /// let mut bav = BitArrayVec::new(5, 4);
     ///
     /// bav.truncate(2);
-    /// assert_eq!(
-    ///     bav.iter().collect::<Vec<Vec<u8>>>(),
-    ///     vec![vec![0], vec![0]],
-    /// );
+    /// assert_eq!(bav.iter().collect::<Vec<Vec<u8>>>(), vec![vec![0], vec![0]]);
     /// ```
     pub fn truncate(&mut self, len: usize) {
         while len < self.len {
@@ -235,6 +242,7 @@ impl BitArrayVec {
     /// `BitArrayVec`.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bit_array_vec::BitArrayVec;
     ///
@@ -245,16 +253,20 @@ impl BitArrayVec {
     /// ```
     pub fn reserve(&mut self, additional: usize) {
         let desired_cap = self.len + additional;
-        if desired_cap > Self::get_elem_count(self.bit_count, self.blocks.capacity()) {
-            let additional_blocks = Self::get_block_count(self.bit_count, desired_cap) - self.blocks.len();
-            self.blocks.reserve(additional_blocks);
+        if desired_cap <= Self::get_elem_count(self.bit_count, self.blocks.capacity()) {
+            return;
         }
+
+        let target_cap = Self::get_block_count(self.bit_count, desired_cap);
+        let additional_blocks = target_cap - self.blocks.len();
+        self.blocks.reserve(additional_blocks);
     }
 
     /// Reserves capacity for at least `additional` more bit arrays to be inserted in the given
     /// `BitArrayVec`. Allocates exactly enough space in the underlying `Vec<u8>`.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bit_array_vec::BitArrayVec;
     ///
@@ -265,18 +277,23 @@ impl BitArrayVec {
     /// ```
     pub fn reserve_exact(&mut self, additional: usize) {
         let desired_cap = self.len + additional;
-        if desired_cap > Self::get_elem_count(self.bit_count, self.blocks.capacity()) {
-            let additional_blocks = Self::get_block_count(self.bit_count, desired_cap) - self.blocks.len();
-            self.blocks.reserve_exact(additional_blocks);
+        if desired_cap <= Self::get_elem_count(self.bit_count, self.blocks.capacity()) {
+            return;
         }
+
+        let target_cap = Self::get_block_count(self.bit_count, desired_cap);
+        let additional_blocks = target_cap - self.blocks.len();
+        self.blocks.reserve_exact(additional_blocks);
     }
 
     /// Returns and removes the last element of the `BitVecArray`.
     ///
     /// # Panics
+    ///
     /// Panics if the `BitVecArray` is empty.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bit_array_vec::BitArrayVec;
     ///
@@ -303,6 +320,7 @@ impl BitArrayVec {
     /// Pushes an element into the `BitArrayVec`.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bit_array_vec::BitArrayVec;
     ///
@@ -316,7 +334,8 @@ impl BitArrayVec {
     pub fn push(&mut self, bytes: &[u8]) {
         let new_block_len = Self::get_block_count(self.bit_count, self.len + 1);
         let block_len = self.blocks.len();
-        self.blocks.extend((0..(new_block_len - block_len)).map(|_| 0));
+        self.blocks
+            .extend(iter::repeat(0).take(new_block_len - block_len));
         let len = self.len;
         let occupied_len = self.occupied_len;
         self.len += 1;
@@ -330,6 +349,7 @@ impl BitArrayVec {
     /// Clears all elements in the `BitVecArray`, setting all bit arrays to zero.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bit_array_vec::BitArrayVec;
     ///
@@ -352,6 +372,7 @@ impl BitArrayVec {
     /// Returns an iterator over the elements of the vector in order.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bit_array_vec::BitArrayVec;
     ///
@@ -359,10 +380,7 @@ impl BitArrayVec {
     ///
     /// bav.push(&[1]);
     ///
-    /// assert_eq!(
-    ///     bav.iter().collect::<Vec<Vec<u8>>>(),
-    ///     vec![vec![0], vec![1]],
-    /// );
+    /// assert_eq!(bav.iter().collect::<Vec<Vec<u8>>>(), vec![vec![0], vec![1]]);
     /// ```
     pub fn iter(&self) -> BitArrayVecIter {
         BitArrayVecIter {
@@ -374,6 +392,7 @@ impl BitArrayVec {
     /// Returns the capacity of the `BitArrayVec`.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bit_array_vec::BitArrayVec;
     ///
@@ -389,6 +408,7 @@ impl BitArrayVec {
     /// Returns the number of elements in the `BitArrayVec`.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bit_array_vec::BitArrayVec;
     ///
@@ -404,6 +424,7 @@ impl BitArrayVec {
     /// Returns `true` if the `BitArrayVec` is empty.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bit_array_vec::BitArrayVec;
     ///
@@ -420,6 +441,7 @@ impl BitArrayVec {
     /// Returns the number of non-zero elements in the `BitArrayVec`;
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bit_array_vec::BitArrayVec;
     ///
@@ -435,6 +457,7 @@ impl BitArrayVec {
     /// Returns the number of bits in each bit array stored by the `BitArrayVec`.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bit_array_vec::BitArrayVec;
     ///
@@ -464,8 +487,8 @@ impl<'a> Iterator for BitArrayVecIter<'a> {
 }
 
 impl<'a> IntoIterator for &'a BitArrayVec {
-    type Item = Vec<u8>;
     type IntoIter = BitArrayVecIter<'a>;
+    type Item = Vec<u8>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
@@ -489,8 +512,8 @@ impl Iterator for BitArrayVecIntoIter {
 }
 
 impl IntoIterator for BitArrayVec {
-    type Item = Vec<u8>;
     type IntoIter = BitArrayVecIntoIter;
+    type Item = Vec<u8>;
 
     fn into_iter(self) -> Self::IntoIter {
         let len = self.len;

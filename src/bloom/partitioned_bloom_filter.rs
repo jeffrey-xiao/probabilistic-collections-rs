@@ -13,6 +13,7 @@ use util;
 /// hash functions you are using.
 ///
 /// # Examples
+///
 /// ```
 /// use probabilistic_collections::bloom::PartitionedBloomFilter;
 ///
@@ -46,6 +47,7 @@ impl<T> PartitionedBloomFilter<T> {
     /// `item_count` items and a maximum false positive probability of `fpp`.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::PartitionedBloomFilter;
     ///
@@ -53,7 +55,8 @@ impl<T> PartitionedBloomFilter<T> {
     /// ```
     pub fn from_item_count(item_count: usize, fpp: f64) -> Self {
         let hasher_count = Self::get_hasher_count(fpp);
-        let bit_count = (item_count as f64 * fpp.ln() / -2f64.ln().powi(2) / (hasher_count as f64)).ceil() as usize;
+        let bit_count = (item_count as f64 * fpp.ln() / -2f64.ln().powi(2) / (hasher_count as f64))
+            .ceil() as usize;
         PartitionedBloomFilter {
             bit_vec: BitVec::new(bit_count * hasher_count),
             hashers: util::get_hashers(),
@@ -67,6 +70,7 @@ impl<T> PartitionedBloomFilter<T> {
     /// maximum false positive probability of `fpp`.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::PartitionedBloomFilter;
     ///
@@ -86,6 +90,7 @@ impl<T> PartitionedBloomFilter<T> {
     /// Inserts an element into the bloom filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::PartitionedBloomFilter;
     ///
@@ -111,6 +116,7 @@ impl<T> PartitionedBloomFilter<T> {
     /// Checks if an element is possibly in the bloom filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::PartitionedBloomFilter;
     ///
@@ -138,6 +144,7 @@ impl<T> PartitionedBloomFilter<T> {
     /// Returns the number of bits in the bloom filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::PartitionedBloomFilter;
     ///
@@ -152,6 +159,7 @@ impl<T> PartitionedBloomFilter<T> {
     /// Returns `true` if the bloom filter is empty.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::PartitionedBloomFilter;
     ///
@@ -166,6 +174,7 @@ impl<T> PartitionedBloomFilter<T> {
     /// Returns the number of bits in each partition in the bloom filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::PartitionedBloomFilter;
     ///
@@ -180,6 +189,7 @@ impl<T> PartitionedBloomFilter<T> {
     /// Returns the number of hash functions used by the bloom filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::PartitionedBloomFilter;
     ///
@@ -194,6 +204,7 @@ impl<T> PartitionedBloomFilter<T> {
     /// Clears the bloom filter, removing all elements.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::PartitionedBloomFilter;
     ///
@@ -211,6 +222,7 @@ impl<T> PartitionedBloomFilter<T> {
     /// Returns the number of set bits in the bloom filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::PartitionedBloomFilter;
     ///
@@ -226,6 +238,7 @@ impl<T> PartitionedBloomFilter<T> {
     /// Returns the number of unset bits in the bloom filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::PartitionedBloomFilter;
     ///
@@ -245,6 +258,7 @@ impl<T> PartitionedBloomFilter<T> {
     /// partitions instead of considering each partition individually.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::PartitionedBloomFilter;
     ///

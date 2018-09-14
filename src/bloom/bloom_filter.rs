@@ -18,6 +18,7 @@ use util;
 /// predictable memory usage.
 ///
 /// # Examples
+///
 /// ```
 /// use probabilistic_collections::bloom::BloomFilter;
 ///
@@ -50,6 +51,7 @@ impl<T> BloomFilter<T> {
     /// and a maximum false positive probability of `fpp`.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::BloomFilter;
     ///
@@ -69,6 +71,7 @@ impl<T> BloomFilter<T> {
     /// of `item_count` items.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::BloomFilter;
     ///
@@ -87,6 +90,7 @@ impl<T> BloomFilter<T> {
     /// probability of `fpp`.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::BloomFilter;
     ///
@@ -105,6 +109,7 @@ impl<T> BloomFilter<T> {
     /// Inserts an element into the bloom filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::BloomFilter;
     ///
@@ -129,6 +134,7 @@ impl<T> BloomFilter<T> {
     /// Checks if an element is possibly in the bloom filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::BloomFilter;
     ///
@@ -155,6 +161,7 @@ impl<T> BloomFilter<T> {
     /// Returns the number of bits in the bloom filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::BloomFilter;
     ///
@@ -169,6 +176,7 @@ impl<T> BloomFilter<T> {
     /// Returns `true` if the bloom filter is empty.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::BloomFilter;
     ///
@@ -183,6 +191,7 @@ impl<T> BloomFilter<T> {
     /// Returns the number of hash functions used by the bloom filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::BloomFilter;
     ///
@@ -197,6 +206,7 @@ impl<T> BloomFilter<T> {
     /// Clears the bloom filter, removing all elements.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::BloomFilter;
     ///
@@ -214,6 +224,7 @@ impl<T> BloomFilter<T> {
     /// Returns the number of set bits in the bloom filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::BloomFilter;
     ///
@@ -229,6 +240,7 @@ impl<T> BloomFilter<T> {
     /// Returns the number of unset bits in the bloom filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::BloomFilter;
     ///
@@ -245,6 +257,7 @@ impl<T> BloomFilter<T> {
     /// increase as more items are added.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::BloomFilter;
     ///
@@ -289,7 +302,12 @@ impl<'de, T> Deserialize<'de> for BloomFilter<T> {
     where
         D: Deserializer<'de>,
     {
-        enum Field { HasherCount, Keys0, Keys1, BitVec };
+        enum Field {
+            HasherCount,
+            Keys0,
+            Keys1,
+            BitVec,
+        };
 
         impl<'de> Deserialize<'de> for Field {
             fn deserialize<D>(deserializer: D) -> Result<Field, D::Error>
@@ -336,13 +354,17 @@ impl<'de, T> Deserialize<'de> for BloomFilter<T> {
             where
                 V: SeqAccess<'de>,
             {
-                let hasher_count = seq.next_element()?
+                let hasher_count = seq
+                    .next_element()?
                     .ok_or_else(|| de::Error::invalid_length(0, &self))?;
-                let keys_0: (u64, u64) = seq.next_element()?
+                let keys_0: (u64, u64) = seq
+                    .next_element()?
                     .ok_or_else(|| de::Error::invalid_length(1, &self))?;
-                let keys_1: (u64, u64) = seq.next_element()?
+                let keys_1: (u64, u64) = seq
+                    .next_element()?
                     .ok_or_else(|| de::Error::invalid_length(2, &self))?;
-                let bit_vec = seq.next_element()?
+                let bit_vec = seq
+                    .next_element()?
                     .ok_or_else(|| de::Error::invalid_length(3, &self))?;
                 Ok(BloomFilter {
                     hasher_count,
@@ -391,9 +413,12 @@ impl<'de, T> Deserialize<'de> for BloomFilter<T> {
                         },
                     }
                 }
-                let hasher_count = hasher_count.ok_or_else(|| de::Error::missing_field("hasher_count"))?;
-                let keys_0: (u64, u64) = keys_0.ok_or_else(|| de::Error::missing_field("keys_0"))?;
-                let keys_1: (u64, u64) = keys_1.ok_or_else(|| de::Error::missing_field("keys_1"))?;
+                let hasher_count =
+                    hasher_count.ok_or_else(|| de::Error::missing_field("hasher_count"))?;
+                let keys_0: (u64, u64) =
+                    keys_0.ok_or_else(|| de::Error::missing_field("keys_0"))?;
+                let keys_1: (u64, u64) =
+                    keys_1.ok_or_else(|| de::Error::missing_field("keys_1"))?;
                 let bit_vec = bit_vec.ok_or_else(|| de::Error::missing_field("bit_vec"))?;
                 Ok(BloomFilter {
                     hasher_count,

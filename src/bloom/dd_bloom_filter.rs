@@ -16,6 +16,7 @@ const PRIME: u64 = 0xFFFF_FFFF_FFFF_FFC5;
 /// false negative rate and slow convergence rate.
 ///
 /// # Examples
+///
 /// ```
 /// use probabilistic_collections::bloom::BSBloomFilter;
 ///
@@ -50,6 +51,7 @@ impl<T> BSBloomFilter<T> {
     /// positive probability of `fpp`.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::BSBloomFilter;
     ///
@@ -74,6 +76,7 @@ impl<T> BSBloomFilter<T> {
     /// Inserts an element into the bloom filter and returns if it is distinct
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::BSBloomFilter;
     ///
@@ -109,6 +112,7 @@ impl<T> BSBloomFilter<T> {
     /// Checks if an element is possibly in the bloom filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::BSBloomFilter;
     ///
@@ -140,6 +144,7 @@ impl<T> BSBloomFilter<T> {
     /// Returns the number of bits in the bloom filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::BSBloomFilter;
     ///
@@ -154,6 +159,7 @@ impl<T> BSBloomFilter<T> {
     /// Returns `true` if the bloom filter is empty.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::BSBloomFilter;
     ///
@@ -168,6 +174,7 @@ impl<T> BSBloomFilter<T> {
     /// Returns the number of bits in each partition in the bloom filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::BSBloomFilter;
     ///
@@ -182,6 +189,7 @@ impl<T> BSBloomFilter<T> {
     /// Returns the number of hash functions used by the bloom filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::BSBloomFilter;
     ///
@@ -196,6 +204,7 @@ impl<T> BSBloomFilter<T> {
     /// Clears the bloom filter, removing all elements.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::BSBloomFilter;
     ///
@@ -213,6 +222,7 @@ impl<T> BSBloomFilter<T> {
     /// Returns the number of set bits in the bloom filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::BSBloomFilter;
     ///
@@ -228,6 +238,7 @@ impl<T> BSBloomFilter<T> {
     /// Returns the number of unset bits in the bloom filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::BSBloomFilter;
     ///
@@ -248,6 +259,7 @@ impl<T> BSBloomFilter<T> {
 /// from a high false negative rate and slow convergence rate.
 ///
 /// # Examples
+///
 /// ```
 /// use probabilistic_collections::bloom::BSSDBloomFilter;
 ///
@@ -282,6 +294,7 @@ impl<T> BSSDBloomFilter<T> {
     /// positive probability of `fpp`.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::BSSDBloomFilter;
     ///
@@ -306,6 +319,7 @@ impl<T> BSSDBloomFilter<T> {
     /// Inserts an element into the bloom filter and returns if it is distinct
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::BSSDBloomFilter;
     ///
@@ -341,6 +355,7 @@ impl<T> BSSDBloomFilter<T> {
     /// Checks if an element is possibly in the bloom filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::BSSDBloomFilter;
     ///
@@ -368,6 +383,7 @@ impl<T> BSSDBloomFilter<T> {
     /// Returns the number of bits in the bloom filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::BSSDBloomFilter;
     ///
@@ -382,6 +398,7 @@ impl<T> BSSDBloomFilter<T> {
     /// Returns `true` if the bloom filter is empty.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::BSSDBloomFilter;
     ///
@@ -396,6 +413,7 @@ impl<T> BSSDBloomFilter<T> {
     /// Returns the number of bits in each partition in the bloom filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::BSSDBloomFilter;
     ///
@@ -410,6 +428,7 @@ impl<T> BSSDBloomFilter<T> {
     /// Returns the number of hash functions used by the bloom filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::BSSDBloomFilter;
     ///
@@ -424,6 +443,7 @@ impl<T> BSSDBloomFilter<T> {
     /// Clears the bloom filter, removing all elements.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::BSSDBloomFilter;
     ///
@@ -441,6 +461,7 @@ impl<T> BSSDBloomFilter<T> {
     /// Returns the number of set bits in the bloom filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::BSSDBloomFilter;
     ///
@@ -456,6 +477,7 @@ impl<T> BSSDBloomFilter<T> {
     /// Returns the number of unset bits in the bloom filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::BSSDBloomFilter;
     ///
@@ -476,6 +498,7 @@ impl<T> BSSDBloomFilter<T> {
 /// suffers from a high false negative rate and slow convergence rate.
 ///
 /// # Examples
+///
 /// ```
 /// use probabilistic_collections::bloom::RLBSBloomFilter;
 ///
@@ -510,6 +533,7 @@ impl<T> RLBSBloomFilter<T> {
     /// positive probability of `fpp`.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::RLBSBloomFilter;
     ///
@@ -534,6 +558,7 @@ impl<T> RLBSBloomFilter<T> {
     /// Inserts an element into the bloom filter and returns if it is distinct
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::RLBSBloomFilter;
     ///
@@ -571,6 +596,7 @@ impl<T> RLBSBloomFilter<T> {
     /// Checks if an element is possibly in the bloom filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::RLBSBloomFilter;
     ///
@@ -597,6 +623,7 @@ impl<T> RLBSBloomFilter<T> {
     /// Returns the number of bits in the bloom filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::RLBSBloomFilter;
     ///
@@ -611,6 +638,7 @@ impl<T> RLBSBloomFilter<T> {
     /// Returns `true` if the bloom filter is empty.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::RLBSBloomFilter;
     ///
@@ -625,6 +653,7 @@ impl<T> RLBSBloomFilter<T> {
     /// Returns the number of bits in each partition in the bloom filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::RLBSBloomFilter;
     ///
@@ -639,6 +668,7 @@ impl<T> RLBSBloomFilter<T> {
     /// Returns the number of hash functions used by the bloom filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::RLBSBloomFilter;
     ///
@@ -653,6 +683,7 @@ impl<T> RLBSBloomFilter<T> {
     /// Clears the bloom filter, removing all elements.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::RLBSBloomFilter;
     ///
@@ -672,6 +703,7 @@ impl<T> RLBSBloomFilter<T> {
     /// Returns the number of set bits in the bloom filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::RLBSBloomFilter;
     ///
@@ -690,6 +722,7 @@ impl<T> RLBSBloomFilter<T> {
     /// Returns the number of unset bits in the bloom filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::RLBSBloomFilter;
     ///

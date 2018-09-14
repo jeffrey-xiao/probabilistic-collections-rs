@@ -19,6 +19,7 @@ use std::marker::PhantomData;
 /// for small cardinalities and small correction for large cardinalities.
 ///
 /// # Examples
+///
 /// ```
 /// # use std::f64::EPSILON;
 /// use probabilistic_collections::hyperloglog::HyperLogLog;
@@ -60,9 +61,11 @@ impl<T> HyperLogLog<T> {
     /// Constructs a new, empty `HyperLogLog<T>` with a given error probability;
     ///
     /// # Panics
+    ///
     /// Panics if `error_probability` is not in (0, 1).
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::hyperloglog::HyperLogLog;
     ///
@@ -85,6 +88,7 @@ impl<T> HyperLogLog<T> {
     /// Inserts an item into the `HyperLogLog<T>`.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::hyperloglog::HyperLogLog;
     ///
@@ -108,9 +112,11 @@ impl<T> HyperLogLog<T> {
     /// Merges `self` with `other`.
     ///
     /// # Panics
+    ///
     /// Panics if the error probability of `self` is not equal to the error probability of `other`.
     ///
     /// # Examples
+    ///
     /// ```
     /// # use std::f64::EPSILON;
     /// use probabilistic_collections::hyperloglog::HyperLogLog;
@@ -137,12 +143,17 @@ impl<T> HyperLogLog<T> {
 
     fn get_estimate(&self) -> f64 {
         let len = self.registers.len() as f64;
-        1.0 / (self.alpha * len * len * self.registers.iter().map(|value| 1.0 / 2.0f64.powi(i32::from(*value))).sum::<f64>())
+        1.0 / (self.alpha * len * len * self
+            .registers
+            .iter()
+            .map(|value| 1.0 / 2.0f64.powi(i32::from(*value)))
+            .sum::<f64>())
     }
 
     /// Returns the estimated number of distinct items in the `HyperLogLog<T>`.
     ///
     /// # Examples
+    ///
     /// ```
     /// # use std::f64::EPSILON;
     /// use probabilistic_collections::hyperloglog::HyperLogLog;
@@ -157,7 +168,8 @@ impl<T> HyperLogLog<T> {
         let len = self.registers.len() as f64;
         match self.get_estimate() {
             x if x <= 2.5 * len => {
-                let zeros = self.registers
+                let zeros = self
+                    .registers
                     .iter()
                     .map(|value| if *value == 0 { 1 } else { 0 })
                     .sum::<u64>();
@@ -171,6 +183,7 @@ impl<T> HyperLogLog<T> {
     /// Returns `true` is the `HyperLogLog<T>` is empty.
     ///
     /// # Examples
+    ///
     /// ```
     /// # use std::f64::EPSILON;
     /// use probabilistic_collections::hyperloglog::HyperLogLog;
@@ -188,6 +201,7 @@ impl<T> HyperLogLog<T> {
     /// Clears the `HyperLogLog<T>`, removing all items.
     ///
     /// # Examples
+    ///
     /// ```
     /// # use std::f64::EPSILON;
     /// use probabilistic_collections::hyperloglog::HyperLogLog;

@@ -11,17 +11,24 @@ use std::marker::PhantomData;
 /// them.
 ///
 /// # Examples
+///
 /// ```
 /// use probabilistic_collections::similarity::{ShingleIterator, SimHash};
 ///
 /// let sim_hash = SimHash::new();
 ///
 /// assert_eq!(
-///     sim_hash.get_sim_hash(ShingleIterator::new(2, "the cat sat on a mat".split(' ').collect())),
+///     sim_hash.get_sim_hash(ShingleIterator::new(
+///         2,
+///         "the cat sat on a mat".split(' ').collect()
+///     )),
 ///     0b1111011011001001011100000010010110011011101011110110000010001001,
 /// );
 /// assert_eq!(
-///     sim_hash.get_sim_hash(ShingleIterator::new(2, "the cat sat on the mat".split(' ').collect())),
+///     sim_hash.get_sim_hash(ShingleIterator::new(
+///         2,
+///         "the cat sat on the mat".split(' ').collect()
+///     )),
 ///     0b0111011001000001011110000011011010011011101001100101101000000001,
 /// );
 /// ```
@@ -31,10 +38,10 @@ pub struct SimHash<T, U> {
 }
 
 impl<T, U> SimHash<T, U> {
-
     /// Constructs a new `SimHash`,
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::similarity::{ShingleIterator, SimHash};
     ///
@@ -60,19 +67,23 @@ impl<T, U> SimHash<T, U> {
     /// Returns the hash associated with iterator `iter`.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::similarity::{ShingleIterator, SimHash};
     ///
     /// let sim_hash = SimHash::new();
     ///
     /// assert_eq!(
-    ///     sim_hash.get_sim_hash(ShingleIterator::new(2, "the cat sat on a mat".split(' ').collect())),
+    ///     sim_hash.get_sim_hash(ShingleIterator::new(
+    ///         2,
+    ///         "the cat sat on a mat".split(' ').collect()
+    ///     )),
     ///     0b1111011011001001011100000010010110011011101011110110000010001001,
     /// );
     /// ```
     pub fn get_sim_hash(&self, iter: T) -> u64
     where
-        T: Iterator<Item=U>,
+        T: Iterator<Item = U>,
         U: Hash,
     {
         let mut counts = [0i64; 64];
@@ -99,6 +110,7 @@ impl<T, U> SimHash<T, U> {
     /// based on `window_size`.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::similarity::{ShingleIterator, SimHash};
     ///
@@ -113,13 +125,9 @@ impl<T, U> SimHash<T, U> {
     ///     ],
     /// );
     /// ```
-    pub fn report_similarities(
-        &self,
-        window_size: usize,
-        iter_vec: Vec<T>,
-    ) -> Vec<(usize, usize)>
+    pub fn report_similarities(&self, window_size: usize, iter_vec: Vec<T>) -> Vec<(usize, usize)>
     where
-        T: Iterator<Item=U>,
+        T: Iterator<Item = U>,
         U: Hash,
     {
         assert!(window_size > 1);
@@ -161,7 +169,6 @@ mod tests {
     static S1: &'static str = "the cat sat on a mat";
     static S2: &'static str = "the cat sat on the mat";
     static S3: &'static str = "we all scream for ice cream";
-
 
     #[test]
     fn test_sim_hash() {

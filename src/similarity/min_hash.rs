@@ -10,6 +10,7 @@ use util;
 /// minimum hash values that are equal divided by the number of total hash functions used.
 ///
 /// # Examples
+///
 /// ```
 /// use probabilistic_collections::similarity::{MinHash, ShingleIterator};
 ///
@@ -30,10 +31,10 @@ pub struct MinHash<T, U> {
 }
 
 impl<T, U> MinHash<T, U> {
-
     /// Constructs a new `MinHash` with a specified number of hash functions to use.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::similarity::{MinHash, ShingleIterator};
     ///
@@ -51,6 +52,7 @@ impl<T, U> MinHash<T, U> {
     /// used in conjunction with `get_similarity_from_hashes` when doing multiple comparisons.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::similarity::{MinHash, ShingleIterator};
     ///
@@ -61,7 +63,7 @@ impl<T, U> MinHash<T, U> {
     /// ```
     pub fn get_min_hashes(&self, iter: T) -> Vec<u64>
     where
-        T: Iterator<Item=U>,
+        T: Iterator<Item = U>,
         U: Hash,
     {
         let hash_pairs = iter
@@ -74,14 +76,14 @@ impl<T, U> MinHash<T, U> {
                     .map(|hashes| util::get_hash(index, hashes))
                     .min()
                     .expect("Expected non-zero `hasher_count` and shingles")
-            })
-            .collect()
+            }).collect()
     }
 
     /// Returns the estimated Jaccard Similarity measure from the minimum hashes of two iterators.
     /// This function is used in conjunction with `get_min_hashes` when doing multiple comparisons.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::similarity::{MinHash, ShingleIterator};
     ///
@@ -90,18 +92,22 @@ impl<T, U> MinHash<T, U> {
     /// let shingles = ShingleIterator::new(2, "the cat sat on a mat".split(' ').collect());
     /// let min_hashes = min_hash.get_min_hashes(shingles);
     /// ```
-    pub fn get_similarity_from_hashes(&self, min_hashes_1: Vec<u64>, min_hashes_2: Vec<u64>) -> f64 {
+    pub fn get_similarity_from_hashes(
+        &self,
+        min_hashes_1: Vec<u64>,
+        min_hashes_2: Vec<u64>,
+    ) -> f64 {
         assert_eq!(min_hashes_1.len(), min_hashes_2.len());
-        let matches: u64 = min_hashes_1.iter()
+        let matches: u64 = min_hashes_1
+            .iter()
             .zip(min_hashes_2.iter())
             .map(|(min_hash_1, min_hash_2)| {
                 if min_hash_1 == min_hash_2 {
-                    return 1
+                    return 1;
                 } else {
-                    return 0
+                    return 0;
                 }
-            })
-            .sum();
+            }).sum();
 
         (matches as f64) / (self.hasher_count as f64)
     }
@@ -110,6 +116,7 @@ impl<T, U> MinHash<T, U> {
     /// `iter_2`.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::similarity::{MinHash, ShingleIterator};
     ///
@@ -125,18 +132,16 @@ impl<T, U> MinHash<T, U> {
     /// ```
     pub fn get_similarity(&self, iter_1: T, iter_2: T) -> f64
     where
-        T: Iterator<Item=U>,
+        T: Iterator<Item = U>,
         U: Hash,
     {
-        self.get_similarity_from_hashes(
-            self.get_min_hashes(iter_1),
-            self.get_min_hashes(iter_2),
-        )
+        self.get_similarity_from_hashes(self.get_min_hashes(iter_1), self.get_min_hashes(iter_2))
     }
 
     /// Returns the number of hash functions being used in `MinHash`.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::similarity::{MinHash, ShingleIterator};
     ///
@@ -156,7 +161,6 @@ mod tests {
     static S1: &'static str = "the cat sat on a mat";
     static S2: &'static str = "the cat sat on the mat";
     static S3: &'static str = "we all scream for ice cream";
-
 
     #[test]
     fn test_min_hash() {

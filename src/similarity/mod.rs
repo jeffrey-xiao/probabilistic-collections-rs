@@ -13,6 +13,7 @@ use std::iter::FromIterator;
 /// A w-shingle iterator for an list of items.
 ///
 /// # Examples
+///
 /// ```
 /// use probabilistic_collections::similarity::ShingleIterator;
 ///
@@ -36,12 +37,13 @@ where
 
 impl<'a, T> ShingleIterator<'a, T>
 where
-    T: ?Sized
+    T: ?Sized,
 {
     /// Constructs a new `ShingleIterator` that contains shingles of `token_count` tokens from
     /// `tokens`.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::similarity::ShingleIterator;
     ///
@@ -58,7 +60,7 @@ where
 
 impl<'a, T> Iterator for ShingleIterator<'a, T>
 where
-    T: ?Sized
+    T: ?Sized,
 {
     type Item = Vec<&'a T>;
 
@@ -67,7 +69,7 @@ where
             return None;
         }
         self.index += 1;
-        return Some(self.tokens[self.index - 1..self.index + self.token_count - 1].to_vec())
+        return Some(self.tokens[self.index - 1..self.index + self.token_count - 1].to_vec());
     }
 }
 
@@ -75,6 +77,7 @@ where
 /// between the intersection and the union.
 ///
 /// # Examples
+///
 /// ```
 /// use probabilistic_collections::similarity::{get_jaccard_similarity, ShingleIterator};
 ///
@@ -88,7 +91,7 @@ where
 /// ```
 pub fn get_jaccard_similarity<T, U>(iter_1: T, iter_2: T) -> f64
 where
-    T: Iterator<Item=U>,
+    T: Iterator<Item = U>,
     U: Hash + Eq,
 {
     let h1 = HashSet::<U>::from_iter(iter_1);
@@ -103,7 +106,6 @@ mod tests {
     static S1: &'static str = "the cat sat on a mat";
     static S2: &'static str = "the cat sat on the mat";
     static S3: &'static str = "we all scream for ice cream";
-
 
     #[test]
     fn test_jaccard_similarity() {

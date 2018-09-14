@@ -16,6 +16,7 @@ use util;
 /// variations of tradition Bloom filters that support deletion (E.G. counting Bloom filters).
 ///
 /// # Examples
+///
 /// ```
 /// use probabilistic_collections::cuckoo::CuckooFilter;
 ///
@@ -51,9 +52,11 @@ impl<T> CuckooFilter<T> {
     /// The length of each bucket will be rounded off to the next power of two.
     ///
     /// # Panics
+    ///
     /// Panics if `item_count` is 0.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::cuckoo::CuckooFilter;
     ///
@@ -61,7 +64,8 @@ impl<T> CuckooFilter<T> {
     /// ```
     pub fn new(item_count: usize) -> Self {
         assert!(item_count > 0);
-        let bucket_len = ((item_count + DEFAULT_ENTRIES_PER_INDEX - 1) / DEFAULT_ENTRIES_PER_INDEX).next_power_of_two();
+        let bucket_len = ((item_count + DEFAULT_ENTRIES_PER_INDEX - 1) / DEFAULT_ENTRIES_PER_INDEX)
+            .next_power_of_two();
         CuckooFilter {
             max_kicks: DEFAULT_MAX_KICKS,
             entries_per_index: DEFAULT_ENTRIES_PER_INDEX,
@@ -83,10 +87,12 @@ impl<T> CuckooFilter<T> {
     /// The length of each bucket will be rounded off to the next power of two.
     ///
     /// # Panics
+    ///
     /// Panics if `item_count` is 0, if `fingerprint_bit_count` less than 1 or greater than 64, or
     /// if `entries_per_index` is 0.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::cuckoo::CuckooFilter;
     ///
@@ -98,12 +104,13 @@ impl<T> CuckooFilter<T> {
         entries_per_index: usize,
     ) -> Self {
         assert!(
-            item_count > 0 &&
-            fingerprint_bit_count > 1 &&
-            fingerprint_bit_count <= 64 &&
-            entries_per_index > 0
+            item_count > 0
+                && fingerprint_bit_count > 1
+                && fingerprint_bit_count <= 64
+                && entries_per_index > 0
         );
-        let bucket_len = ((item_count + entries_per_index - 1) / entries_per_index).next_power_of_two();
+        let exact_bucket_len = (item_count + entries_per_index - 1) / entries_per_index;
+        let bucket_len = exact_bucket_len.next_power_of_two();
         CuckooFilter {
             max_kicks: DEFAULT_MAX_KICKS,
             entries_per_index,
@@ -124,9 +131,11 @@ impl<T> CuckooFilter<T> {
     /// The length of each bucket will be rounded off to the next power of two.
     ///
     /// # Panics
+    ///
     /// Panics if `item_count` is 0 or if `entries_per_index` is 0.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::cuckoo::CuckooFilter;
     ///
@@ -136,7 +145,8 @@ impl<T> CuckooFilter<T> {
         assert!(item_count > 0 && entries_per_index > 0);
         let power = 2.0 / (1.0 - (1.0 - fpp).powf(1.0 / (2.0 * entries_per_index as f64)));
         let fingerprint_bit_count = power.log2().ceil() as usize;
-        let bucket_len = ((item_count + entries_per_index - 1) / entries_per_index).next_power_of_two();
+        let exact_bucket_len = (item_count + entries_per_index - 1) / entries_per_index;
+        let bucket_len = exact_bucket_len.next_power_of_two();
         CuckooFilter {
             max_kicks: DEFAULT_MAX_KICKS,
             entries_per_index,
@@ -158,10 +168,12 @@ impl<T> CuckooFilter<T> {
     /// The length of each bucket will be rounded off to the next power of two.
     ///
     /// # Panics
+    ///
     /// Panics if `item_count` is 0, if `fingerprint_bit_count` is less than 1 or greater than 64,
     /// or if it is impossible to achieve the given maximum false positive probability.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::cuckoo::CuckooFilter;
     ///
@@ -177,7 +189,8 @@ impl<T> CuckooFilter<T> {
         let single_fpp = (fingerprints_count - 2.0) / (fingerprints_count - 1.0);
         let entries_per_index = ((1.0 - fpp).log(single_fpp) / 2.0).floor() as usize;
         assert!(entries_per_index > 0);
-        let bucket_len = ((item_count + entries_per_index - 1) / entries_per_index).next_power_of_two();
+        let exact_bucket_len = (item_count + entries_per_index - 1) / entries_per_index;
+        let bucket_len = exact_bucket_len.next_power_of_two();
         CuckooFilter {
             max_kicks: DEFAULT_MAX_KICKS,
             entries_per_index,
@@ -232,6 +245,7 @@ impl<T> CuckooFilter<T> {
     /// Inserts an element into the cuckoo filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::cuckoo::CuckooFilter;
     ///
@@ -246,7 +260,11 @@ impl<T> CuckooFilter<T> {
         let hashes = util::get_hashes::<T, U>(&self.hashers, item);
         let (mut fingerprint, index_1, index_2) = self.get_fingerprint_and_indexes(hashes);
         if !self.contains_fingerprint(&fingerprint, index_1, index_2) {
-            if self.insert_fingerprint(fingerprint.as_slice(), index_1) || self.insert_fingerprint(fingerprint.as_slice(), index_2) {
+            if self.insert_fingerprint(fingerprint.as_slice(), index_1) {
+                return;
+            }
+
+            if self.insert_fingerprint(fingerprint.as_slice(), index_2) {
                 return;
             }
 
@@ -262,7 +280,8 @@ impl<T> CuckooFilter<T> {
                 self.fingerprint_vec.set(vec_index, fingerprint.as_slice());
                 fingerprint = new_fingerprint;
                 prev_index = index;
-                index = (prev_index ^ Self::get_raw_fingerprint(&fingerprint) as usize) % self.bucket_len();
+                index = prev_index ^ Self::get_raw_fingerprint(&fingerprint) as usize;
+                index %= self.bucket_len();
                 if self.insert_fingerprint(fingerprint.as_slice(), index) {
                     return;
                 }
@@ -279,11 +298,13 @@ impl<T> CuckooFilter<T> {
         let entries_per_index = self.entries_per_index;
         for bucket_index in 0..entries_per_index {
             let vec_index = self.get_vec_index(index, bucket_index);
-            if self.fingerprint_vec
+            let is_empty = self
+                .fingerprint_vec
                 .get(vec_index)
                 .iter()
-                .all(|byte| *byte == 0)
-            {
+                .all(|byte| *byte == 0);
+
+            if is_empty {
                 self.fingerprint_vec.set(vec_index, fingerprint);
                 return true;
             }
@@ -294,6 +315,7 @@ impl<T> CuckooFilter<T> {
     /// Removes an element from the cuckoo filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::cuckoo::CuckooFilter;
     ///
@@ -319,17 +341,27 @@ impl<T> CuckooFilter<T> {
         let raw_fingerprint = Self::get_raw_fingerprint(fingerprint);
         let min_index = cmp::min(index_1, index_2);
         let entries_per_index = self.entries_per_index;
-        if let Some(index) = self.extra_items.iter().position(|item| *item == (raw_fingerprint, min_index)) {
+        if let Some(index) = self
+            .extra_items
+            .iter()
+            .position(|item| *item == (raw_fingerprint, min_index))
+        {
             self.extra_items.swap_remove(index);
         }
         for bucket_index in 0..entries_per_index {
             let vec_index_1 = self.get_vec_index(index_1, bucket_index);
             let vec_index_2 = self.get_vec_index(index_2, bucket_index);
-            if Self::get_raw_fingerprint(&self.fingerprint_vec.get(vec_index_1)) == raw_fingerprint {
-                self.fingerprint_vec.set(vec_index_1, Self::get_fingerprint(0).as_slice());
+            let fingerprint_1 = &self.fingerprint_vec.get(vec_index_1);
+            let fingerprint_2 = &self.fingerprint_vec.get(vec_index_2);
+            if Self::get_raw_fingerprint(fingerprint_1) == raw_fingerprint {
+                let empty_fingerprint = Self::get_fingerprint(0);
+                self.fingerprint_vec
+                    .set(vec_index_1, empty_fingerprint.as_slice());
             }
-            if Self::get_raw_fingerprint(&self.fingerprint_vec.get(vec_index_2)) == raw_fingerprint {
-                self.fingerprint_vec.set(vec_index_2, Self::get_fingerprint(0).as_slice());
+            if Self::get_raw_fingerprint(fingerprint_2) == raw_fingerprint {
+                let empty_fingerprint = Self::get_fingerprint(0);
+                self.fingerprint_vec
+                    .set(vec_index_2, empty_fingerprint.as_slice());
             }
         }
     }
@@ -337,6 +369,7 @@ impl<T> CuckooFilter<T> {
     /// Checks if an element is possibly in the cuckoo filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::cuckoo::CuckooFilter;
     ///
@@ -365,14 +398,24 @@ impl<T> CuckooFilter<T> {
         (0..entries_per_index).any(|bucket_index| {
             let vec_index_1 = self.get_vec_index(index_1, bucket_index);
             let vec_index_2 = self.get_vec_index(index_2, bucket_index);
-            self.fingerprint_vec.get(vec_index_1).iter().zip(fingerprint).all(|pair| pair.0 == pair.1) ||
-            self.fingerprint_vec.get(vec_index_2).iter().zip(fingerprint).all(|pair| pair.0 == pair.1)
+            self.fingerprint_vec
+                .get(vec_index_1)
+                .iter()
+                .zip(fingerprint)
+                .all(|pair| pair.0 == pair.1)
+                || self
+                    .fingerprint_vec
+                    .get(vec_index_2)
+                    .iter()
+                    .zip(fingerprint)
+                    .all(|pair| pair.0 == pair.1)
         })
     }
 
     /// Clears the cuckoo filter, removing all elements.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::cuckoo::CuckooFilter;
     ///
@@ -392,6 +435,7 @@ impl<T> CuckooFilter<T> {
     /// in the extra items vector.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::cuckoo::CuckooFilter;
     ///
@@ -406,6 +450,7 @@ impl<T> CuckooFilter<T> {
     /// Returns `true` if there are no occupied entries in the cuckoo filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::cuckoo::CuckooFilter;
     ///
@@ -421,6 +466,7 @@ impl<T> CuckooFilter<T> {
     /// vector even through the length of the cuckoo filter is less than the capacity.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::cuckoo::CuckooFilter;
     ///
@@ -435,6 +481,7 @@ impl<T> CuckooFilter<T> {
     /// Returns the length of each bucket in the cuckoo filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::cuckoo::CuckooFilter;
     ///
@@ -449,6 +496,7 @@ impl<T> CuckooFilter<T> {
     /// Returns the number of entries per index in the cuckoo filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::cuckoo::CuckooFilter;
     ///
@@ -463,6 +511,7 @@ impl<T> CuckooFilter<T> {
     /// Returns the number of items that could not be inserted into the CuckooFilter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::cuckoo::CuckooFilter;
     ///
@@ -479,6 +528,7 @@ impl<T> CuckooFilter<T> {
     /// Returns `true` if there are any items that could not be inserted into the cuckoo filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::cuckoo::CuckooFilter;
     ///
@@ -495,6 +545,7 @@ impl<T> CuckooFilter<T> {
     /// Returns the number of bits in each item fingerprint.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::cuckoo::CuckooFilter;
     ///
@@ -510,6 +561,7 @@ impl<T> CuckooFilter<T> {
     /// increase as more items are added.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::cuckoo::CuckooFilter;
     ///
@@ -702,7 +754,7 @@ mod tests {
 
         filter.insert(&0);
 
-        let expected_fpp = 1.0 - ((2f64.powi(11) - 2.0) / (2f64.powi(11) - 1.0)).powf(2.0 * 4.0 * 1.0 / 128.0);
+        let expected_fpp = 1.0 - ((2f64.powi(11) - 2.0) / (2f64.powi(11) - 1.0)).powf(8.0 / 128.0);
         assert!((filter.estimate_fpp() - expected_fpp).abs() < 1e-15);
     }
 }

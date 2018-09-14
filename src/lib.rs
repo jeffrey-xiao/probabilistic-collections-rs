@@ -1,4 +1,5 @@
 //! # probabilistic-collections-rs
+//!
 //! [![probabilistic-collections](http://meritbadge.herokuapp.com/probabilistic-collections)](https://crates.io/crates/probabilistic-collections)
 //! [![Documentation](https://docs.rs/probabilistic-collections/badge.svg)](https://docs.rs/probabilistic-collections)
 //! [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -11,6 +12,7 @@
 //! and streaming applications.
 //!
 //! ## Usage
+//!
 //! Add this to your `Cargo.toml`:
 //! ```toml
 //! [dependencies]
@@ -22,6 +24,7 @@
 //! ```
 //!
 //! ## References
+//!
 //!  - [Scalable Bloom Filters](https://dl.acm.org/citation.cfm?id=1224501)
 //!  > Almeida, Paulo Sérgio, Carlos Baquero, Nuno Preguiça, and David Hutchison. 2007. “Scalable Bloom Filters.” *Inf. Process. Lett.* 101 (6). Amsterdam, The Netherlands, The Netherlands: Elsevier North-Holland, Inc.: 255–61. doi:[10.1016/j.ipl.2006.10.007](https://doi.org/10.1016/j.ipl.2006.10.007).
 //!  - [Advanced Bloom Filter Based Algorithms for Efficient Approximate Data De-Duplication in Streams](https://arxiv.org/abs/1212.3964)
@@ -44,7 +47,6 @@ extern crate serde;
 extern crate serde_derive;
 extern crate siphasher;
 
-mod util;
 pub mod bit_array_vec;
 pub mod bit_vec;
 pub mod bloom;
@@ -52,3 +54,4 @@ pub mod count_min_sketch;
 pub mod cuckoo;
 pub mod hyperloglog;
 pub mod similarity;
+mod util;

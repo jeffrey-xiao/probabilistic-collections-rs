@@ -12,6 +12,7 @@ use std::hash::Hash;
 /// of the scalable bloom filter will be `initial_fpp * 1 / (1 - tightening_ratio)`.
 ///
 /// # Examples
+///
 /// ```
 /// use probabilistic_collections::bloom::ScalableBloomFilter;
 ///
@@ -43,6 +44,7 @@ impl<T> ScalableBloomFilter<T> {
     /// probability.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::ScalableBloomFilter;
     ///
@@ -89,6 +91,7 @@ impl<T> ScalableBloomFilter<T> {
     /// Inserts an element into the scalable bloom filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::ScalableBloomFilter;
     ///
@@ -102,7 +105,10 @@ impl<T> ScalableBloomFilter<T> {
         U: Hash + ?Sized,
     {
         if !self.filters.iter().any(|filter| filter.contains(item)) {
-            let filter = self.filters.last_mut().expect("Expected non-empty filters.");
+            let filter = self
+                .filters
+                .last_mut()
+                .expect("Expected non-empty filters.");
             filter.insert(item);
             self.approximate_bits_used += filter.hasher_count();
         }
@@ -112,6 +118,7 @@ impl<T> ScalableBloomFilter<T> {
     /// Checks if an element is possibly in the scalable bloom filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::ScalableBloomFilter;
     ///
@@ -132,6 +139,7 @@ impl<T> ScalableBloomFilter<T> {
     /// Returns the number of bits in the scalable bloom filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::ScalableBloomFilter;
     ///
@@ -146,6 +154,7 @@ impl<T> ScalableBloomFilter<T> {
     /// Returns `true` if the scalable bloom filter is empty.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::ScalableBloomFilter;
     ///
@@ -160,6 +169,7 @@ impl<T> ScalableBloomFilter<T> {
     /// Returns the number of bloom filters used by the scalable bloom filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::ScalableBloomFilter;
     ///
@@ -174,6 +184,7 @@ impl<T> ScalableBloomFilter<T> {
     /// Clears the scalable bloom filter, removing all elements.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::ScalableBloomFilter;
     ///
@@ -185,7 +196,11 @@ impl<T> ScalableBloomFilter<T> {
     /// assert!(!filter.contains("foo"));
     /// ```
     pub fn clear(&mut self) {
-        let initial_bit_count = self.filters.first().expect("Expected non-empty filters.").len();
+        let initial_bit_count = self
+            .filters
+            .first()
+            .expect("Expected non-empty filters.")
+            .len();
         self.filters = vec![BloomFilter::from_fpp(initial_bit_count, self.initial_fpp)];
         self.approximate_bits_used = 0;
     }
@@ -193,6 +208,7 @@ impl<T> ScalableBloomFilter<T> {
     /// Returns the number of set bits in the scalable bloom filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::ScalableBloomFilter;
     ///
@@ -208,6 +224,7 @@ impl<T> ScalableBloomFilter<T> {
     /// Returns the number of unset bits in the scalable bloom filter.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::ScalableBloomFilter;
     ///
@@ -224,6 +241,7 @@ impl<T> ScalableBloomFilter<T> {
     /// will increase as more items are added.
     ///
     /// # Examples
+    ///
     /// ```
     /// use probabilistic_collections::bloom::ScalableBloomFilter;
     ///
@@ -235,7 +253,8 @@ impl<T> ScalableBloomFilter<T> {
     /// assert!(filter.estimate_fpp() < 0.01);
     /// ```
     pub fn estimate_fpp(&self) -> f64 {
-        1.0 - self.filters
+        1.0 - self
+            .filters
             .iter()
             .map(|filter| 1.0 - filter.estimate_fpp())
             .product::<f64>()
