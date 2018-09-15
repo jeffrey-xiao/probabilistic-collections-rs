@@ -75,7 +75,7 @@ impl<T, U> MinHash<T, U> {
                     .iter()
                     .map(|hashes| util::get_hash(index, hashes))
                     .min()
-                    .expect("Expected non-zero `hasher_count` and shingles")
+                    .expect("Expected non-zero `hasher_count` and shingles.")
             }).collect()
     }
 

@@ -805,7 +805,7 @@ impl Index<usize> for BitVec {
     type Output = bool;
 
     fn index(&self, index: usize) -> &bool {
-        if self.get(index).expect("Index out of bounds.") {
+        if self.get(index).expect("Error: index out of bounds.") {
             &TRUE
         } else {
             &FALSE

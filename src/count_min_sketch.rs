@@ -21,7 +21,7 @@ pub struct CountMinStrategy;
 impl CountStrategy for CountMinStrategy {
     fn get_estimate(_items: i64, _rows: usize, _cols: usize, iter: ItemValueIter) -> i64 {
         iter.min()
-            .expect("Expected `CountMinSketch` to be non-empty")
+            .expect("Expected `CountMinSketch` to be non-empty.")
     }
 }
 
