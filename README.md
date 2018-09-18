@@ -3,6 +3,7 @@
 [![probabilistic-collections](http://meritbadge.herokuapp.com/probabilistic-collections)](https://crates.io/crates/probabilistic-collections)
 [![Documentation](https://docs.rs/probabilistic-collections/badge.svg)](https://docs.rs/probabilistic-collections)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Build Status](https://travis-ci.org/jeffrey-xiao/probabilistic-collections-rs.svg?branch=master)](https://travis-ci.org/jeffrey-xiao/probabilistic-collections-rs)
 [![codecov](https://codecov.io/gh/jeffrey-xiao/probabilistic-collections-rs/branch/master/graph/badge.svg)](https://codecov.io/gh/jeffrey-xiao/probabilistic-collections-rs)
 
@@ -46,7 +47,7 @@ extern crate probabilistic_collections;
 
 ## License
 
-`probabilistic-collections-rs` is dual-licensed under the terms of either the MIT license or the
+`probabilistic-collections-rs` is dual-licensed under the terms of either the MIT License or the
 Apache License (Version 2.0).
 
 See [LICENSE-APACHE](LICENSE-APACHE) and [LICENSE-MIT](LICENSE-MIT) for more details.
