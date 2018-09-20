@@ -3,9 +3,10 @@
 use rand::{Rng, XorShiftRng};
 use siphasher::sip::SipHasher;
 use std::borrow::Borrow;
-use std::marker::PhantomData;
-use std::hash::{Hash, Hasher};
 use std::cmp::Ordering;
+use std::f64::consts;
+use std::hash::{Hash, Hasher};
+use std::marker::PhantomData;
 
 const SHIFTED_MASK: u64 = 0b001;
 const CONTINUATION_MASK: u64 = 0b010;
@@ -14,7 +15,6 @@ const METADATA_MASK: u64 = 0b111;
 const METADATA_BITS: u8 = 3;
 
 pub struct QuotientFilter<T> {
-    quotient_bits: u8,
     remainder_bits: u8,
     // Defined as RR...RRMMM where R are remainder bits and M are metadata bits
     // MMM
@@ -80,7 +80,6 @@ impl<T> QuotientFilter<T> {
         let slot_bits = remainder_bits + METADATA_BITS;
         let table_len = ((slot_bits * quotient_bits) as usize + 63) / 64;
         QuotientFilter {
-            quotient_bits,
             remainder_bits,
             slot_bits,
             quotient_mask: Self::get_mask(quotient_bits),
@@ -122,7 +121,8 @@ impl<T> QuotientFilter<T> {
         }
     }
 
-    fn get_run_start(&self, mut index: usize) -> usize {
+    // returns (index of run start, # of runs from cluster start, # of occupied slots)
+    fn get_run_start(&self, mut index: usize) -> (usize, usize, usize) {
         // find start of cluster
         let mut occupied_count = 0;
         loop {
@@ -138,19 +138,24 @@ impl<T> QuotientFilter<T> {
         }
 
         // find start of run
+        let mut runs_count = 0;
+        let mut total_occupied_count = occupied_count - 1;
         loop {
             let slot = self.get_slot(index);
-            if slot & CONTINUATION_MASK == 0 {
-                occupied_count -= 1;
+            if slot & OCCUPIED_MASK != 0 {
+                total_occupied_count += 1;
             }
-            if occupied_count == 0 {
+            if slot & CONTINUATION_MASK == 0 {
+                runs_count += 1;
+            }
+            if occupied_count == runs_count {
                 break;
             }
 
             self.increment_index(&mut index);
         }
 
-        index
+        (index, runs_count, total_occupied_count)
     }
 
     fn insert_and_shift_right(&mut self, mut index: usize, slot: u64) {
@@ -186,11 +191,13 @@ impl<T> QuotientFilter<T> {
     // {
     //    let (quotient, remainder) = self.get_quotient_and_remainder(self.get_hash(item));
     pub fn insert(&mut self, quotient: usize, remainder: u64) {
+        assert!(self.len() < self.capacity());
         let slot = self.get_slot(quotient);
 
         // empty slot
         if slot & METADATA_MASK == 0 {
             self.set_slot(quotient, (remainder << METADATA_BITS) | OCCUPIED_MASK);
+            self.len += 1;
             return;
         }
 
@@ -210,7 +217,7 @@ impl<T> QuotientFilter<T> {
         }
 
         // insert into run and maintain sorted order
-        let mut index = self.get_run_start(quotient);
+        let (mut index, ..) = self.get_run_start(quotient);
         let run_start = index;
         let mut new_slot = remainder << METADATA_BITS;
         let mut slot = self.get_slot(index);
@@ -224,6 +231,7 @@ impl<T> QuotientFilter<T> {
                 }
 
                 self.increment_index(&mut index);
+                slot = self.get_slot(index);
 
                 // end of run
                 if slot & CONTINUATION_MASK == 0 {
@@ -237,7 +245,7 @@ impl<T> QuotientFilter<T> {
                 run_start_slot |= CONTINUATION_MASK;
                 self.set_slot(run_start, run_start_slot);
             } else {
-                slot |= CONTINUATION_MASK;
+                new_slot |= CONTINUATION_MASK;
             }
         }
 
@@ -246,10 +254,94 @@ impl<T> QuotientFilter<T> {
             new_slot |= SHIFTED_MASK;
         }
 
-        println!("INSERTING {} AT {} {:06b}", remainder, index, new_slot);
+        self.len += 1;
         self.insert_and_shift_right(index, new_slot);
     }
 
+    // pub fn remove<U>(&mut self, item: &U)
+    // where
+    //     T: Borrow<U>,
+    //     U: Hash + ?Sized,
+    // {
+    //    let (quotient, remainder) = self.get_quotient_and_remainder(self.get_hash(item));
+    pub fn remove(&mut self, quotient: usize, remainder: u64) {
+        let (mut index, mut runs_count, mut occupied_count) = self.get_run_start(quotient);
+        let mut slot = self.get_slot(index);
+        loop {
+            match (slot >> METADATA_BITS).cmp(&remainder) {
+                Ordering::Equal => break,
+                // runs are sorted, so further elements in run will always be larger
+                Ordering::Greater => return,
+                Ordering::Less => {
+                    self.increment_index(&mut index);
+                    slot = self.get_slot(index);
+
+                    if slot & OCCUPIED_MASK != 0 {
+                        occupied_count += 1;
+                    }
+
+                    // end of run
+                    if slot & CONTINUATION_MASK == 0 {
+                        return;
+                    }
+                }
+            }
+        }
+
+        // found element, have to delete and shift left
+        let mut is_run_start = slot & CONTINUATION_MASK == 0;
+
+        // keep occupied bit only, if it exists
+        slot &= OCCUPIED_MASK;
+        self.set_slot(index, 0);
+
+        let mut next_index = index;
+        self.increment_index(&mut next_index);
+        let mut next_slot = self.get_slot(next_index);
+
+        // continue until it is not shifted and not a continuation: the only cases are if it is an
+        // element in its canonical position, or if the slot is empty
+        while next_slot & CONTINUATION_MASK != 0 || next_slot & SHIFTED_MASK != 0 {
+            self.set_slot(next_index, 0);
+
+            // update number of runs since the entire run gets shifted to left
+            if next_slot & CONTINUATION_MASK == 0 {
+                runs_count += 1;
+            } else {
+                // if first element is a start of a run, the next element must be a start of a run. The
+                // next element is either already a start of a run or the new start of the removed
+                // element's run
+                if !is_run_start {
+                    slot |= CONTINUATION_MASK;
+                }
+            }
+            is_run_start = false;
+
+            // if current slot is occupied and the occupied count is equal to the number of runs,
+            // then the shifted element is in its canonical slot
+            println!("AT {}, occupied: {}, runs: {}", index, occupied_count, runs_count);
+            if slot & OCCUPIED_MASK == 0 || occupied_count != runs_count {
+                slot |= SHIFTED_MASK;
+            }
+
+            slot |= next_slot & !METADATA_MASK;
+            self.set_slot(index, slot);
+
+            // update occupied count since occupied bit does not get shifted
+            if next_slot & OCCUPIED_MASK != 0 {
+                occupied_count += 1;
+            }
+
+            // keep occupied bit only, if it exists
+            slot = next_slot & OCCUPIED_MASK;
+
+            index = next_index;
+            self.increment_index(&mut next_index);
+            next_slot = self.get_slot(next_index);
+        }
+
+        self.len -= 1;
+    }
 
     pub fn contains<U>(&self, item: &U) -> bool
     where
@@ -264,16 +356,18 @@ impl<T> QuotientFilter<T> {
             return false;
         }
 
-        let mut index = self.get_run_start(quotient);
+        let (mut index, ..) = self.get_run_start(quotient);
 
+        let mut slot = self.get_slot(index);
         loop {
-            let slot = self.get_slot(index);
             match (slot >> METADATA_BITS).cmp(&remainder) {
                 Ordering::Equal => return true,
                 // runs are sorted, so further elements in run will always be larger
                 Ordering::Greater => return false,
                 Ordering::Less => {
                     self.increment_index(&mut index);
+                    slot = self.get_slot(index);
+
                     // end of run
                     if slot & CONTINUATION_MASK == 0 {
                         break;
@@ -283,6 +377,30 @@ impl<T> QuotientFilter<T> {
         }
 
         false
+    }
+
+    pub fn clear(&mut self) {
+        for value in &mut self.table {
+            *value = 0;
+        }
+        self.len = 0;
+    }
+
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    pub fn capacity(&self) -> usize {
+        self.capacity
+    }
+
+    pub fn estimate_fpp(&self) -> f64 {
+        let fill_ratio = self.len() as f64 / self.capacity() as f64;
+        1.0 - consts::E.powf(- fill_ratio / 2.0f64.powf(self.remainder_bits as f64))
     }
 }
 
@@ -297,7 +415,6 @@ impl<T> std::fmt::Debug for QuotientFilter<T> {
         }
         Ok(())
     }
-
 }
 
 mod tests {
@@ -311,11 +428,42 @@ mod tests {
         qf.insert(7, 7);
         println!("{:?}", qf);
 
-        qf.insert(1, 3);
+        qf.insert(1, 2);
         qf.insert(2, 4);
         println!("{:?}", qf);
 
+        qf.insert(1, 3);
+        println!("{:?}", qf);
+        qf.insert(1, 7);
+
+        qf.remove(7, 7);
+        println!("{:?}", qf);
+
+        qf.remove(1, 2);
+        println!("{:?}", qf);
+
+        qf.remove(1, 5);
+        qf.remove(1, 3);
+        println!("{:?}", qf);
+        qf.remove(1, 7);
+        qf.remove(2, 4);
+        qf.remove(4, 6);
+        println!("{:?}", qf);
+
+        qf.insert(1, 5);
+        qf.insert(1, 4);
+        qf.insert(1, 3);
         qf.insert(1, 2);
+        qf.insert(1, 1);
+        qf.insert(2, 1);
+        qf.insert(3, 1);
+        qf.insert(4, 1);
+        println!("{:?}", qf);
+        qf.remove(1, 1);
+        qf.remove(1, 2);
+        qf.remove(1, 3);
+        qf.remove(1, 4);
+        qf.remove(1, 5);
         println!("{:?}", qf);
     }
 }
