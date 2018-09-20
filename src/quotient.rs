@@ -15,6 +15,7 @@ const METADATA_MASK: u64 = 0b111;
 const METADATA_BITS: u8 = 3;
 
 pub struct QuotientFilter<T> {
+    quotient_bits: u8,
     remainder_bits: u8,
     // Defined as RR...RRMMM where R are remainder bits and M are metadata bits
     // MMM
@@ -29,7 +30,6 @@ pub struct QuotientFilter<T> {
     table: Vec<u64>,
     hasher: SipHasher,
     len: usize,
-    capacity: usize,
     _marker: PhantomData<T>,
 }
 
@@ -54,11 +54,11 @@ impl<T> QuotientFilter<T> {
     }
 
     fn get_quotient_and_remainder(&self, hash: u64) -> (usize, u64) {
-        (((hash >> self.remainder_mask) & self.quotient_mask) as usize, hash & self.remainder_mask)
+        (((hash >> self.remainder_bits) & self.quotient_mask) as usize, hash & self.remainder_mask)
     }
 
     fn increment_index(&self, index: &mut usize) {
-        if *index == self.capacity - 1 {
+        if *index == self.capacity() - 1 {
             *index = 0;
         } else {
             *index += 1;
@@ -67,7 +67,7 @@ impl<T> QuotientFilter<T> {
 
     fn decrement_index(&self, index: &mut usize) {
         if *index == 0 {
-            *index = self.capacity - 1;
+            *index = self.capacity() - 1;
         } else {
             *index -= 1;
         }
@@ -78,8 +78,9 @@ impl<T> QuotientFilter<T> {
         assert!(remainder_bits > 0);
         assert!(quotient_bits + remainder_bits <= 64);
         let slot_bits = remainder_bits + METADATA_BITS;
-        let table_len = ((slot_bits * quotient_bits) as usize + 63) / 64;
+        let table_len = ((slot_bits as u64 * (1u64 << quotient_bits)) as usize + 63) / 64;
         QuotientFilter {
+            quotient_bits,
             remainder_bits,
             slot_bits,
             quotient_mask: Self::get_mask(quotient_bits),
@@ -88,9 +89,14 @@ impl<T> QuotientFilter<T> {
             table: vec![0; table_len],
             hasher: Self::get_hasher(),
             len: 0,
-            capacity: 1 << quotient_bits,
             _marker: PhantomData,
         }
+    }
+
+    pub fn from_fpp(fpp: f64, capacity: usize) -> Self {
+        let quotient_bits = ((capacity * 2) as f64).log2().ceil() as u8;
+        let remainder_bits = (1.0 / -2.0 / (1.0 - fpp).ln()).log2().ceil() as u8;
+        Self::new(quotient_bits, remainder_bits)
     }
 
     fn get_slot(&self, index: usize) -> u64 {
@@ -136,10 +142,11 @@ impl<T> QuotientFilter<T> {
 
             self.decrement_index(&mut index);
         }
+        // println!("START OF CLUSTER {}", index);
 
         // find start of run
         let mut runs_count = 0;
-        let mut total_occupied_count = occupied_count - 1;
+        let mut total_occupied_count = 0;
         loop {
             let slot = self.get_slot(index);
             if slot & OCCUPIED_MASK != 0 {
@@ -154,6 +161,7 @@ impl<T> QuotientFilter<T> {
 
             self.increment_index(&mut index);
         }
+        // println!("START OF RUN {}", index);
 
         (index, runs_count, total_occupied_count)
     }
@@ -184,14 +192,14 @@ impl<T> QuotientFilter<T> {
         }
     }
 
-    // pub fn insert<U>(&mut self, item: &U)
-    // where
-    //     T: Borrow<U>,
-    //     U: Hash + ?Sized,
-    // {
-    //    let (quotient, remainder) = self.get_quotient_and_remainder(self.get_hash(item));
-    pub fn insert(&mut self, quotient: usize, remainder: u64) {
+    pub fn insert<U>(&mut self, item: &U)
+    where
+        T: Borrow<U>,
+        U: Hash + ?Sized,
+    {
         assert!(self.len() < self.capacity());
+        let (quotient, remainder) = self.get_quotient_and_remainder(self.get_hash(item));
+        // println!("insert {} {}", quotient, remainder);
         let slot = self.get_slot(quotient);
 
         // empty slot
@@ -202,9 +210,9 @@ impl<T> QuotientFilter<T> {
         }
 
         // item already exists
-        // if self.contains(item) {
-        //     return;
-        // }
+        if self.contains(item) {
+            return;
+        }
 
         let mut new_run = false;
 
@@ -258,19 +266,25 @@ impl<T> QuotientFilter<T> {
         self.insert_and_shift_right(index, new_slot);
     }
 
-    // pub fn remove<U>(&mut self, item: &U)
-    // where
-    //     T: Borrow<U>,
-    //     U: Hash + ?Sized,
-    // {
-    //    let (quotient, remainder) = self.get_quotient_and_remainder(self.get_hash(item));
-    pub fn remove(&mut self, quotient: usize, remainder: u64) {
+    pub fn remove<U>(&mut self, item: &U)
+    where
+        T: Borrow<U>,
+        U: Hash + ?Sized,
+    {
+        let (quotient, remainder) = self.get_quotient_and_remainder(self.get_hash(item));
+        // println!("remove {} {}", quotient, remainder);
+
+        // empty slot
+        if self.get_slot(quotient) & METADATA_MASK == 0 {
+            return;
+        }
+
         let (mut index, mut runs_count, mut occupied_count) = self.get_run_start(quotient);
         let mut slot = self.get_slot(index);
         loop {
             match (slot >> METADATA_BITS).cmp(&remainder) {
                 Ordering::Equal => break,
-                // runs are sorted, so further elements in run will always be larger
+                // runs are sorted, so further items in run will always be larger
                 Ordering::Greater => return,
                 Ordering::Less => {
                     self.increment_index(&mut index);
@@ -288,7 +302,7 @@ impl<T> QuotientFilter<T> {
             }
         }
 
-        // found element, have to delete and shift left
+        // found item, have to delete and shift left
         let mut is_run_start = slot & CONTINUATION_MASK == 0;
 
         // keep occupied bit only, if it exists
@@ -300,17 +314,22 @@ impl<T> QuotientFilter<T> {
         let mut next_slot = self.get_slot(next_index);
 
         // continue until it is not shifted and not a continuation: the only cases are if it is an
-        // element in its canonical position, or if the slot is empty
+        // item in its canonical position, or if the slot is empty
         while next_slot & CONTINUATION_MASK != 0 || next_slot & SHIFTED_MASK != 0 {
             self.set_slot(next_index, 0);
 
             // update number of runs since the entire run gets shifted to left
             if next_slot & CONTINUATION_MASK == 0 {
                 runs_count += 1;
+                // next slow is a new run, so we can delete occupied bit of canonical position
+                if is_run_start {
+                    let canonical_slot = self.get_slot(quotient) & !OCCUPIED_MASK;
+                    self.set_slot(quotient, canonical_slot);
+                }
             } else {
-                // if first element is a start of a run, the next element must be a start of a run. The
-                // next element is either already a start of a run or the new start of the removed
-                // element's run
+                // if first item is a start of a run, the next item must be a start of a run. The
+                // next item is either already a start of a run or the new start of the removed
+                // item's run
                 if !is_run_start {
                     slot |= CONTINUATION_MASK;
                 }
@@ -318,8 +337,8 @@ impl<T> QuotientFilter<T> {
             is_run_start = false;
 
             // if current slot is occupied and the occupied count is equal to the number of runs,
-            // then the shifted element is in its canonical slot
-            println!("AT {}, occupied: {}, runs: {}", index, occupied_count, runs_count);
+            // then the shifted item is in its canonical slot
+            // println!("IN REMOVING AND INSERTING {} WITH {} {}", next_slot >> METADATA_BITS, occupied_count, runs_count);
             if slot & OCCUPIED_MASK == 0 || occupied_count != runs_count {
                 slot |= SHIFTED_MASK;
             }
@@ -349,11 +368,17 @@ impl<T> QuotientFilter<T> {
         U: Hash + ?Sized,
     {
         let (quotient, remainder) = self.get_quotient_and_remainder(self.get_hash(item));
+        // println!("contains {} {}", quotient, remainder);
         let slot = self.get_slot(quotient);
 
         // empty slot
         if slot & METADATA_MASK == 0 {
             return false;
+        }
+
+        // item in canonical slot
+        if slot >> METADATA_BITS == remainder {
+            return true;
         }
 
         let (mut index, ..) = self.get_run_start(quotient);
@@ -362,7 +387,7 @@ impl<T> QuotientFilter<T> {
         loop {
             match (slot >> METADATA_BITS).cmp(&remainder) {
                 Ordering::Equal => return true,
-                // runs are sorted, so further elements in run will always be larger
+                // runs are sorted, so further items in run will always be larger
                 Ordering::Greater => return false,
                 Ordering::Less => {
                     self.increment_index(&mut index);
@@ -395,7 +420,15 @@ impl<T> QuotientFilter<T> {
     }
 
     pub fn capacity(&self) -> usize {
-        self.capacity
+        1 << self.quotient_bits
+    }
+
+    pub fn quotient_bits(&self) -> u8 {
+        self.quotient_bits
+    }
+
+    pub fn remainder_bits(&self) -> u8 {
+        self.remainder_bits
     }
 
     pub fn estimate_fpp(&self) -> f64 {
@@ -404,66 +437,137 @@ impl<T> QuotientFilter<T> {
     }
 }
 
-use std;
-impl<T> std::fmt::Debug for QuotientFilter<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        for index in 0..self.capacity {
-            let slot = self.get_slot(index);
-            let quotient = slot >> METADATA_BITS;
-            let remainder = slot & METADATA_MASK;
-            write!(f, "{}:{:03b} ", quotient, remainder)?;
+use std::fmt;
+impl<T> fmt::Debug for QuotientFilter<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for i in 0..self.capacity() {
+            let slot = self.get_slot(i);
+            write!(f, "{}|{}:{:03b} ", i, slot >> 3, slot & METADATA_MASK)?;
         }
         Ok(())
     }
 }
 
 mod tests {
+    extern crate rand;
+
+    use self::rand::{thread_rng, Rng};
     use super::QuotientFilter;
 
     #[test]
-    fn test() {
-        let mut qf: QuotientFilter<usize> = QuotientFilter::new(3, 3);
-        qf.insert(1, 5);
-        qf.insert(4, 6);
-        qf.insert(7, 7);
-        println!("{:?}", qf);
+    fn test_new() {
+        let mut filter = QuotientFilter::<usize>::new(8, 4);
+        assert_eq!(filter.capacity(), 256);
+        assert_eq!(filter.quotient_bits(), 8);
+        assert_eq!(filter.remainder_bits(), 4);
+        assert!(filter.is_empty());
 
-        qf.insert(1, 2);
-        qf.insert(2, 4);
-        println!("{:?}", qf);
+        for i in 0..128 {
+            filter.insert(&i);
+        }
 
-        qf.insert(1, 3);
-        println!("{:?}", qf);
-        qf.insert(1, 7);
+        assert!(filter.estimate_fpp() < 0.05);
+    }
 
-        qf.remove(7, 7);
-        println!("{:?}", qf);
+    #[test]
+    fn test_from_fpp() {
+        let mut filter = QuotientFilter::<usize>::from_fpp(0.05, 100);
+        assert_eq!(filter.capacity(), 256);
+        assert_eq!(filter.quotient_bits(), 8);
+        assert_eq!(filter.remainder_bits(), 4);
+        assert!(filter.is_empty());
 
-        qf.remove(1, 2);
-        println!("{:?}", qf);
+        for i in 0..128 {
+            filter.insert(&i);
+        }
 
-        qf.remove(1, 5);
-        qf.remove(1, 3);
-        println!("{:?}", qf);
-        qf.remove(1, 7);
-        qf.remove(2, 4);
-        qf.remove(4, 6);
-        println!("{:?}", qf);
+        assert!(filter.estimate_fpp() < 0.05);
+    }
 
-        qf.insert(1, 5);
-        qf.insert(1, 4);
-        qf.insert(1, 3);
-        qf.insert(1, 2);
-        qf.insert(1, 1);
-        qf.insert(2, 1);
-        qf.insert(3, 1);
-        qf.insert(4, 1);
-        println!("{:?}", qf);
-        qf.remove(1, 1);
-        qf.remove(1, 2);
-        qf.remove(1, 3);
-        qf.remove(1, 4);
-        qf.remove(1, 5);
-        println!("{:?}", qf);
+    #[test]
+    fn test_insert() {
+        let mut filter = QuotientFilter::<String>::new(8, 4);
+        filter.insert("foo");
+        assert_eq!(filter.len(), 1);
+        assert!(!filter.is_empty());
+        assert!(filter.contains("foo"));
+    }
+
+    #[test]
+    fn test_insert_existing_item() {
+        let mut filter = QuotientFilter::<String>::new(8, 4);
+        filter.insert("foo");
+        filter.insert("foo");
+        assert_eq!(filter.len(), 1);
+        assert!(!filter.is_empty());
+        assert!(filter.contains("foo"));
+    }
+
+    #[test]
+    fn test_remove() {
+        let mut filter = QuotientFilter::<String>::new(8, 4);
+        filter.insert("foo");
+        filter.remove("foo");
+
+        assert_eq!(filter.len(), 0);
+        assert!(filter.is_empty());
+        assert!(!filter.contains("foo"));
+    }
+
+    #[test]
+    fn test_clear() {
+        let mut filter = QuotientFilter::<String>::new(8, 4);
+
+        filter.insert("foobar");
+        filter.insert("barfoo");
+        filter.insert("baz");
+        filter.insert("qux");
+
+        filter.clear();
+
+        assert!(!filter.contains("baz"));
+        assert!(!filter.contains("qux"));
+        assert!(!filter.contains("foobar"));
+        assert!(!filter.contains("barfoo"));
+    }
+
+    #[test]
+    fn test_stress() {
+        let mut rng: rand::XorShiftRng = rand::SeedableRng::from_seed([1, 1, 1, 1]);
+        let quotient_bits = 16;
+
+        // large remainder to not get false positives
+        let mut filter = QuotientFilter::<u64>::new(quotient_bits, 48);
+        assert!(filter.is_empty());
+        assert_eq!(filter.quotient_bits(), quotient_bits);
+        assert_eq!(filter.remainder_bits(), 48);
+
+        let mut items = Vec::new();
+        for _ in 0..1 << quotient_bits {
+            let item = rng.gen::<u32>() as u64 + 100;
+            if !filter.contains(&item) {
+                filter.insert(&item);
+                filter.insert(&item);
+                items.push(item);
+                // println!("{:?}", filter);
+            }
+        }
+
+        for i in 0..100 {
+            let item = i;
+            assert!(!filter.contains(&item));
+            // filter.remove(&item);
+        }
+
+        assert_eq!(filter.len(), items.len());
+
+        thread_rng().shuffle(&mut items);
+        for item in items {
+            assert!(filter.contains(&item));
+            // println!("{:?}", filter);
+            filter.remove(&item);
+            // println!("{:?}", filter);
+            assert!(!filter.contains(&item));
+        }
     }
 }

@@ -663,6 +663,7 @@ mod tests {
         let mut filter = CuckooFilter::<String>::new(100);
         filter.insert("foo");
         filter.insert("foo");
+
         assert_eq!(filter.len(), 1);
         assert!(!filter.is_empty());
         assert!(filter.contains("foo"));
