@@ -53,5 +53,6 @@ pub mod bloom;
 pub mod count_min_sketch;
 pub mod cuckoo;
 pub mod hyperloglog;
+pub mod quotient;
 pub mod similarity;
 mod util;

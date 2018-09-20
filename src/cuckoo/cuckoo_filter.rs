@@ -142,7 +142,8 @@ impl<T> CuckooFilter<T> {
     /// let filter = CuckooFilter::<String>::from_entries_per_index(100, 0.01, 4);
     /// ```
     pub fn from_entries_per_index(item_count: usize, fpp: f64, entries_per_index: usize) -> Self {
-        assert!(item_count > 0 && entries_per_index > 0);
+        assert!(item_count > 0);
+        assert!(entries_per_index > 0);
         let power = 2.0 / (1.0 - (1.0 - fpp).powf(1.0 / (2.0 * entries_per_index as f64)));
         let fingerprint_bit_count = power.log2().ceil() as usize;
         let exact_bucket_len = (item_count + entries_per_index - 1) / entries_per_index;
@@ -184,7 +185,8 @@ impl<T> CuckooFilter<T> {
         fpp: f64,
         fingerprint_bit_count: usize,
     ) -> Self {
-        assert!(item_count > 0 && fingerprint_bit_count > 1 && fingerprint_bit_count <= 64);
+        assert!(item_count > 0);
+        assert!(fingerprint_bit_count > 1 && fingerprint_bit_count <= 64);
         let fingerprints_count = 2.0f64.powi(fingerprint_bit_count as i32);
         let single_fpp = (fingerprints_count - 2.0) / (fingerprints_count - 1.0);
         let entries_per_index = ((1.0 - fpp).log(single_fpp) / 2.0).floor() as usize;
