@@ -568,13 +568,13 @@ impl<T> CuckooFilter<T> {
     /// use probabilistic_collections::cuckoo::CuckooFilter;
     ///
     /// let mut filter = CuckooFilter::<String>::new(100);
-    /// assert!(filter.estimate_fpp() < 1e-15);
+    /// assert!(filter.estimated_fpp() < 1e-15);
     ///
     /// filter.insert("foo");
-    /// assert!(filter.estimate_fpp() > 1e-15);
-    /// assert!(filter.estimate_fpp() < 0.01);
+    /// assert!(filter.estimated_fpp() > 1e-15);
+    /// assert!(filter.estimated_fpp() < 0.01);
     /// ```
-    pub fn estimate_fpp(&self) -> f64 {
+    pub fn estimated_fpp(&self) -> f64 {
         let fingerprints_count = 2.0f64.powi(self.fingerprint_bit_count() as i32);
         let single_fpp = (fingerprints_count - 2.0) / (fingerprints_count - 1.0);
         let occupied_len = self.fingerprint_vec.occupied_len();
@@ -751,13 +751,13 @@ mod tests {
     }
 
     #[test]
-    fn test_estimate_fpp() {
+    fn test_estimated_fpp() {
         let mut filter = CuckooFilter::<String>::from_entries_per_index(100, 0.01, 4);
-        assert!(filter.estimate_fpp() < 1e-15);
+        assert!(filter.estimated_fpp() < 1e-15);
 
         filter.insert("foo");
 
         let expected_fpp = 1.0 - ((2f64.powi(11) - 2.0) / (2f64.powi(11) - 1.0)).powf(8.0 / 128.0);
-        assert!((filter.estimate_fpp() - expected_fpp).abs() < 1e-15);
+        assert!((filter.estimated_fpp() - expected_fpp).abs() < 1e-15);
     }
 }

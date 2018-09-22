@@ -610,13 +610,13 @@ impl<T> QuotientFilter<T> {
     /// use probabilistic_collections::quotient::QuotientFilter;
     ///
     /// let mut filter = QuotientFilter::<String>::from_fpp(100, 0.05);
-    /// assert!(filter.estimate_fpp() < 1e-15);
+    /// assert!(filter.estimated_fpp() < 1e-15);
     ///
     /// filter.insert("foo");
-    /// assert!(filter.estimate_fpp() > 1e-15);
-    /// assert!(filter.estimate_fpp() < 0.05);
+    /// assert!(filter.estimated_fpp() > 1e-15);
+    /// assert!(filter.estimated_fpp() < 0.05);
     /// ```
-    pub fn estimate_fpp(&self) -> f64 {
+    pub fn estimated_fpp(&self) -> f64 {
         let fill_ratio = self.len() as f64 / self.capacity() as f64;
         1.0 - consts::E.powf(- fill_ratio / 2.0f64.powf(f64::from(self.remainder_bits)))
     }
@@ -651,7 +651,7 @@ mod tests {
             filter.insert(&i);
         }
 
-        assert!(filter.estimate_fpp() < 0.05);
+        assert!(filter.estimated_fpp() < 0.05);
     }
 
     #[test]
@@ -666,7 +666,7 @@ mod tests {
             filter.insert(&i);
         }
 
-        assert!(filter.estimate_fpp() < 0.05);
+        assert!(filter.estimated_fpp() < 0.05);
     }
 
     #[test]
