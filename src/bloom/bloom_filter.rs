@@ -261,10 +261,10 @@ impl<T> BloomFilter<T> {
     /// ```
     /// use probabilistic_collections::bloom::BloomFilter;
     ///
-    /// let mut filter = BloomFilter::<u32>::new(100, 0.01);
+    /// let mut filter = BloomFilter::<String>::new(100, 0.01);
     /// assert!(filter.estimate_fpp() < 1e-15);
     ///
-    /// filter.insert(&0);
+    /// filter.insert("foo");
     /// assert!(filter.estimate_fpp() > 1e-15);
     /// assert!(filter.estimate_fpp() < 0.01);
     /// ```
@@ -494,10 +494,10 @@ mod tests {
 
     #[test]
     fn test_estimate_fpp() {
-        let mut filter = BloomFilter::<u32>::new(100, 0.01);
+        let mut filter = BloomFilter::<String>::new(100, 0.01);
         assert!(filter.estimate_fpp() < 1e-15);
 
-        filter.insert(&0);
+        filter.insert("foo");
 
         let expected_fpp = (7f64 / 959f64).powi(7);
         assert!((filter.estimate_fpp() - expected_fpp).abs() < 1e-15);

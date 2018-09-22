@@ -245,10 +245,10 @@ impl<T> ScalableBloomFilter<T> {
     /// ```
     /// use probabilistic_collections::bloom::ScalableBloomFilter;
     ///
-    /// let mut filter = ScalableBloomFilter::<u32>::new(100, 0.01, 2.0, 0.5);
+    /// let mut filter = ScalableBloomFilter::<String>::new(100, 0.01, 2.0, 0.5);
     /// assert!(filter.estimate_fpp() < 1e-15);
     ///
-    /// filter.insert(&0);
+    /// filter.insert("foo");
     /// assert!(filter.estimate_fpp() > 1e-15);
     /// assert!(filter.estimate_fpp() < 0.01);
     /// ```

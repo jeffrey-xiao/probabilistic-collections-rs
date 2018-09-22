@@ -82,6 +82,10 @@ impl<T, U> MinHash<T, U> {
     /// Returns the estimated Jaccard Similarity measure from the minimum hashes of two iterators.
     /// This function is used in conjunction with `get_min_hashes` when doing multiple comparisons.
     ///
+    /// # Panics
+    ///
+    /// Panics if the length of the two 
+    ///
     /// # Examples
     ///
     /// ```

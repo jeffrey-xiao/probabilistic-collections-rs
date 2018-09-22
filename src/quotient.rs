@@ -14,6 +14,37 @@ const OCCUPIED_MASK: u64 = 0b100;
 const METADATA_MASK: u64 = 0b111;
 const METADATA_BITS: u8 = 3;
 
+/// A space-efficient probabilistic data structure to test for membership in a set.
+///
+/// A quotient filter is essentially a compact hash table. Each item is hashed to a 64-bit
+/// fingerprint. The top `q` bits is the quotient of the item and the bottom `r` bits is the
+/// remainder of the item. The quotient which defines the index of the table to store the
+/// remainder. This index is called the "canoncial slot" of the item. When multiple items map to
+/// the same location, they are stored in contiguous slots called a run, and the quotient filter
+/// maintains that items in the same run are sorted by their remainder. Additionally, all runs are
+/// sorted by their canonical slot. If run `r1` has a canonical slot at index `i1` and run `r2` has
+/// a canonical slot at index `i2` where `i1` < `i2`, then `r1` occurs to the left of `r2`. Note
+/// that a run's first fingerprint may not occupy its canonical slot if the run has been forced
+/// right by some run to its left. These invariants are established by maintaining three bits of
+/// metadata about a slot: `is_shifted`, `is_continuation`, and `is_occupied`.
+///
+/// # Examples
+///
+/// ```
+/// use probabilistic_collections::quotient::QuotientFilter;
+///
+/// let mut filter = QuotientFilter::<String>::new(8, 4);
+///
+/// assert!(!filter.contains("foo"));
+/// filter.insert("foo");
+/// assert!(filter.contains("foo"));
+///
+/// filter.clear();
+/// assert!(!filter.contains("foo"));
+///
+/// assert_eq!(filter.quotient_bits(), 8);
+/// assert_eq!(filter.remainder_bits(), 4);
+/// ```
 pub struct QuotientFilter<T> {
     quotient_bits: u8,
     remainder_bits: u8,
@@ -73,6 +104,22 @@ impl<T> QuotientFilter<T> {
         }
     }
 
+    /// Constructs a new, empty `QuotientFilter` with the specified number of quotient and
+    /// remainder bits. `quotient_bits` and `remainder_bits` must be positive integers whose sum
+    /// cannot exceed `64`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `quotient_bits` is 0, `remainder_bits` is 0, or if `quotient_bits +
+    /// remainder_bits` is greater than 64.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::quotient::QuotientFilter;
+    ///
+    /// let filter = QuotientFilter::<String>::new(8, 4);
+    /// ```
     pub fn new(quotient_bits: u8, remainder_bits: u8) -> Self {
         assert!(quotient_bits > 0);
         assert!(remainder_bits > 0);
@@ -93,7 +140,22 @@ impl<T> QuotientFilter<T> {
         }
     }
 
-    pub fn from_fpp(fpp: f64, capacity: usize) -> Self {
+    /// Constructs a new, empty `QuotientFilter` that can store `capacity` items with an estimated
+    /// false positive probability of less than `fpp`. The ideal fullness of quotient filter is
+    /// 50%, so the contructed quotient filter will have a maximum capacity of `2 * capacity`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `capacity` is 0, or if `fpp` is not in the range `(0, 1)`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::quotient::QuotientFilter;
+    ///
+    /// let filter = QuotientFilter::<String>::from_fpp(100, 0.05);
+    /// ```
+    pub fn from_fpp(capacity: usize, fpp: f64) -> Self {
         let quotient_bits = ((capacity * 2) as f64).log2().ceil() as u8;
         let remainder_bits = (1.0 / -2.0 / (1.0 - fpp).ln()).log2().ceil() as u8;
         Self::new(quotient_bits, remainder_bits)
@@ -190,6 +252,21 @@ impl<T> QuotientFilter<T> {
         }
     }
 
+    /// Inserts an element into the quotient filter.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the quotient filter is completely full.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::quotient::QuotientFilter;
+    ///
+    /// let mut filter = QuotientFilter::<String>::new(8, 4);
+    ///
+    /// filter.insert("foo");
+    /// ```
     pub fn insert<U>(&mut self, item: &U)
     where
         T: Borrow<U>,
@@ -263,6 +340,74 @@ impl<T> QuotientFilter<T> {
         self.insert_and_shift_right(index, new_slot);
     }
 
+    /// Checks if an element is possibly in the quotient filter.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::quotient::QuotientFilter;
+    ///
+    /// let mut filter = QuotientFilter::<String>::new(8, 4);
+    ///
+    /// assert!(!filter.contains("foo"));
+    /// filter.insert("foo");
+    /// assert!(filter.contains("foo"));
+    /// ```
+    pub fn contains<U>(&self, item: &U) -> bool
+    where
+        T: Borrow<U>,
+        U: Hash + ?Sized,
+    {
+        let (quotient, remainder) = self.get_quotient_and_remainder(self.get_hash(item));
+        let slot = self.get_slot(quotient);
+
+        // empty slot
+        if slot & METADATA_MASK == 0 {
+            return false;
+        }
+
+        // item in canonical slot
+        if slot >> METADATA_BITS == remainder {
+            return true;
+        }
+
+        let (mut index, ..) = self.get_run_start(quotient);
+
+        let mut slot = self.get_slot(index);
+        loop {
+            match (slot >> METADATA_BITS).cmp(&remainder) {
+                Ordering::Equal => return true,
+                // runs are sorted, so further items in run will always be larger
+                Ordering::Greater => return false,
+                Ordering::Less => {
+                    self.increment_index(&mut index);
+                    slot = self.get_slot(index);
+
+                    // end of run
+                    if slot & CONTINUATION_MASK == 0 {
+                        break;
+                    }
+                }
+            }
+        }
+
+        false
+    }
+
+    /// Removes an element from the quotient filter.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::quotient::QuotientFilter;
+    ///
+    /// let mut filter = QuotientFilter::<String>::new(8, 4);
+    ///
+    /// filter.insert("foo");
+    /// assert!(filter.contains("foo"));
+    /// filter.remove("foo");
+    /// assert!(!filter.contains("foo"));
+    /// ```
     pub fn remove<U>(&mut self, item: &U)
     where
         T: Borrow<U>,
@@ -357,47 +502,20 @@ impl<T> QuotientFilter<T> {
         self.len -= 1;
     }
 
-    pub fn contains<U>(&self, item: &U) -> bool
-    where
-        T: Borrow<U>,
-        U: Hash + ?Sized,
-    {
-        let (quotient, remainder) = self.get_quotient_and_remainder(self.get_hash(item));
-        let slot = self.get_slot(quotient);
-
-        // empty slot
-        if slot & METADATA_MASK == 0 {
-            return false;
-        }
-
-        // item in canonical slot
-        if slot >> METADATA_BITS == remainder {
-            return true;
-        }
-
-        let (mut index, ..) = self.get_run_start(quotient);
-
-        let mut slot = self.get_slot(index);
-        loop {
-            match (slot >> METADATA_BITS).cmp(&remainder) {
-                Ordering::Equal => return true,
-                // runs are sorted, so further items in run will always be larger
-                Ordering::Greater => return false,
-                Ordering::Less => {
-                    self.increment_index(&mut index);
-                    slot = self.get_slot(index);
-
-                    // end of run
-                    if slot & CONTINUATION_MASK == 0 {
-                        break;
-                    }
-                }
-            }
-        }
-
-        false
-    }
-
+    /// Clears the quotient filter, removing all elements.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::quotient::QuotientFilter;
+    ///
+    /// let mut filter = QuotientFilter::<String>::new(8, 4);
+    ///
+    /// filter.insert("foo");
+    /// filter.clear();
+    ///
+    /// assert!(!filter.contains("foo"));
+    /// ```
     pub fn clear(&mut self) {
         for value in &mut self.table {
             *value = 0;
@@ -405,26 +523,97 @@ impl<T> QuotientFilter<T> {
         self.len = 0;
     }
 
+    /// Returns the number of items in the quotient filter.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::quotient::QuotientFilter;
+    ///
+    /// let mut filter = QuotientFilter::<String>::new(8, 4);
+    ///
+    /// filter.insert("foo");
+    /// assert_eq!(filter.len(), 1);
+    /// ```
     pub fn len(&self) -> usize {
         self.len
     }
 
+    /// Returns `true` if the quotient filter is empty.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::quotient::QuotientFilter;
+    ///
+    /// let filter = QuotientFilter::<String>::new(8, 4);
+    ///
+    /// assert!(filter.is_empty());
+    /// ```
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
+    /// Returns the capacity of the quotient filter.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::quotient::QuotientFilter;
+    ///
+    /// let filter = QuotientFilter::<String>::new(8, 4);
+    ///
+    /// assert_eq!(filter.capacity(), 256);
+    /// ```
     pub fn capacity(&self) -> usize {
         1 << self.quotient_bits
     }
 
+    /// Returns the number of quotient bits in a fingerprint for a item.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::quotient::QuotientFilter;
+    ///
+    /// let filter = QuotientFilter::<String>::new(8, 4);
+    ///
+    /// assert_eq!(filter.quotient_bits(), 8);
+    /// ```
     pub fn quotient_bits(&self) -> u8 {
         self.quotient_bits
     }
 
+    /// Returns the number of remainder bits in a fingerprint for a item.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::quotient::QuotientFilter;
+    ///
+    /// let filter = QuotientFilter::<String>::new(8, 4);
+    ///
+    /// assert_eq!(filter.remainder_bits(), 4);
+    /// ```
     pub fn remainder_bits(&self) -> u8 {
         self.remainder_bits
     }
 
+    /// Returns the estimated false positive probability of the quotient filter. This value will
+    /// increase as more items are added.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::quotient::QuotientFilter;
+    ///
+    /// let mut filter = QuotientFilter::<String>::from_fpp(100, 0.05);
+    /// assert!(filter.estimate_fpp() < 1e-15);
+    ///
+    /// filter.insert("foo");
+    /// assert!(filter.estimate_fpp() > 1e-15);
+    /// assert!(filter.estimate_fpp() < 0.05);
+    /// ```
     pub fn estimate_fpp(&self) -> f64 {
         let fill_ratio = self.len() as f64 / self.capacity() as f64;
         1.0 - consts::E.powf(- fill_ratio / 2.0f64.powf(self.remainder_bits as f64))
@@ -465,7 +654,7 @@ mod tests {
 
     #[test]
     fn test_from_fpp() {
-        let mut filter = QuotientFilter::<usize>::from_fpp(0.05, 100);
+        let mut filter = QuotientFilter::<usize>::from_fpp(100, 0.05);
         assert_eq!(filter.capacity(), 256);
         assert_eq!(filter.quotient_bits(), 8);
         assert_eq!(filter.remainder_bits(), 4);
@@ -529,16 +718,17 @@ mod tests {
     fn test_stress() {
         let mut rng: rand::XorShiftRng = rand::SeedableRng::from_seed([1, 1, 1, 1]);
         let quotient_bits = 16;
+        let remainder_bits = 48;
 
         // large remainder to not get false positives
-        let mut filter = QuotientFilter::<u64>::new(quotient_bits, 48);
+        let mut filter = QuotientFilter::<u64>::new(quotient_bits, remainder_bits);
         assert!(filter.is_empty());
         assert_eq!(filter.quotient_bits(), quotient_bits);
-        assert_eq!(filter.remainder_bits(), 48);
+        assert_eq!(filter.remainder_bits(), remainder_bits);
 
         let mut items = Vec::new();
         for _ in 0..1 << quotient_bits {
-            let item = rng.gen::<u32>() as u64 + 100;
+            let item = rng.gen_range::<u64>(1 << 32, 1 << 63) as u64;
             if !filter.contains(&item) {
                 filter.insert(&item);
                 filter.insert(&item);
@@ -547,7 +737,7 @@ mod tests {
         }
 
         for i in 0..100 {
-            let item = i;
+            let item = rng.gen_range::<u64>(0, 1 << 32);
             assert!(!filter.contains(&item));
             filter.remove(&item);
         }
