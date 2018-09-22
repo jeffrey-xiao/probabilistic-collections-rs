@@ -142,7 +142,6 @@ impl<T> QuotientFilter<T> {
 
             self.decrement_index(&mut index);
         }
-        // println!("START OF CLUSTER {}", index);
 
         // find start of run
         let mut runs_count = 0;
@@ -161,7 +160,6 @@ impl<T> QuotientFilter<T> {
 
             self.increment_index(&mut index);
         }
-        // println!("START OF RUN {}", index);
 
         (index, runs_count, total_occupied_count)
     }
@@ -199,7 +197,6 @@ impl<T> QuotientFilter<T> {
     {
         assert!(self.len() < self.capacity());
         let (quotient, remainder) = self.get_quotient_and_remainder(self.get_hash(item));
-        // println!("insert {} {}", quotient, remainder);
         let slot = self.get_slot(quotient);
 
         // empty slot
@@ -272,7 +269,6 @@ impl<T> QuotientFilter<T> {
         U: Hash + ?Sized,
     {
         let (quotient, remainder) = self.get_quotient_and_remainder(self.get_hash(item));
-        // println!("remove {} {}", quotient, remainder);
 
         // empty slot
         if self.get_slot(quotient) & METADATA_MASK == 0 {
@@ -338,7 +334,6 @@ impl<T> QuotientFilter<T> {
 
             // if current slot is occupied and the occupied count is equal to the number of runs,
             // then the shifted item is in its canonical slot
-            // println!("IN REMOVING AND INSERTING {} WITH {} {}", next_slot >> METADATA_BITS, occupied_count, runs_count);
             if slot & OCCUPIED_MASK == 0 || occupied_count != runs_count {
                 slot |= SHIFTED_MASK;
             }
@@ -368,7 +363,6 @@ impl<T> QuotientFilter<T> {
         U: Hash + ?Sized,
     {
         let (quotient, remainder) = self.get_quotient_and_remainder(self.get_hash(item));
-        // println!("contains {} {}", quotient, remainder);
         let slot = self.get_slot(quotient);
 
         // empty slot
@@ -549,14 +543,13 @@ mod tests {
                 filter.insert(&item);
                 filter.insert(&item);
                 items.push(item);
-                // println!("{:?}", filter);
             }
         }
 
         for i in 0..100 {
             let item = i;
             assert!(!filter.contains(&item));
-            // filter.remove(&item);
+            filter.remove(&item);
         }
 
         assert_eq!(filter.len(), items.len());
@@ -564,9 +557,7 @@ mod tests {
         thread_rng().shuffle(&mut items);
         for item in items {
             assert!(filter.contains(&item));
-            // println!("{:?}", filter);
             filter.remove(&item);
-            // println!("{:?}", filter);
             assert!(!filter.contains(&item));
         }
     }
