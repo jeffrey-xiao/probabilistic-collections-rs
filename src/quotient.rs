@@ -125,7 +125,7 @@ impl<T> QuotientFilter<T> {
         assert!(remainder_bits > 0);
         assert!(quotient_bits + remainder_bits <= 64);
         let slot_bits = remainder_bits + METADATA_BITS;
-        let table_len = ((slot_bits as u64 * (1u64 << quotient_bits)) as usize + 63) / 64;
+        let table_len = ((u64::from(slot_bits) * (1u64 << quotient_bits)) as usize + 63) / 64;
         QuotientFilter {
             quotient_bits,
             remainder_bits,
@@ -288,15 +288,17 @@ impl<T> QuotientFilter<T> {
             return;
         }
 
-        let mut new_run = false;
-
         // canonical slot not occupied, so insertion will generate a new run
         // we set occupied mask first so `get_run_start` will get the correct position to insert
         // the new run
-        if slot & OCCUPIED_MASK == 0 {
-            self.set_slot(quotient, slot | OCCUPIED_MASK);
-            new_run = true;
-        }
+        let new_run = {
+            if slot & OCCUPIED_MASK == 0 {
+                self.set_slot(quotient, slot | OCCUPIED_MASK);
+                true
+            } else {
+                false
+            }
+        };
 
         // insert into run and maintain sorted order
         let (mut index, ..) = self.get_run_start(quotient);
@@ -467,13 +469,13 @@ impl<T> QuotientFilter<T> {
                     let canonical_slot = self.get_slot(quotient) & !OCCUPIED_MASK;
                     self.set_slot(quotient, canonical_slot);
                 }
-            } else {
-                // if first item is a start of a run, the next item must be a start of a run. The
-                // next item is either already a start of a run or the new start of the removed
-                // item's run
-                if !is_run_start {
-                    slot |= CONTINUATION_MASK;
-                }
+            }
+
+            // if first item is a start of a run, the next item must be a start of a run. The
+            // next item is either already a start of a run or the new start of the removed
+            // item's run
+            else if !is_run_start {
+                slot |= CONTINUATION_MASK;
             }
             is_run_start = false;
 
@@ -616,7 +618,7 @@ impl<T> QuotientFilter<T> {
     /// ```
     pub fn estimate_fpp(&self) -> f64 {
         let fill_ratio = self.len() as f64 / self.capacity() as f64;
-        1.0 - consts::E.powf(- fill_ratio / 2.0f64.powf(self.remainder_bits as f64))
+        1.0 - consts::E.powf(- fill_ratio / 2.0f64.powf(f64::from(self.remainder_bits)))
     }
 }
 
@@ -736,7 +738,7 @@ mod tests {
             }
         }
 
-        for i in 0..100 {
+        for _ in 0..100 {
             let item = rng.gen_range::<u64>(0, 1 << 32);
             assert!(!filter.contains(&item));
             filter.remove(&item);

@@ -69,7 +69,7 @@ where
             return None;
         }
         self.index += 1;
-        return Some(self.tokens[self.index - 1..self.index + self.token_count - 1].to_vec());
+        Some(self.tokens[self.index - 1..self.index + self.token_count - 1].to_vec())
     }
 }
 
@@ -97,7 +97,7 @@ where
     let h1 = HashSet::<U>::from_iter(iter_1);
     let h2 = HashSet::<U>::from_iter(iter_2);
 
-    return (h1.intersection(&h2).count() as f64) / (h1.union(&h2).count() as f64);
+    (h1.intersection(&h2).count() as f64) / (h1.union(&h2).count() as f64)
 }
 
 #[cfg(test)]

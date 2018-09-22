@@ -88,11 +88,11 @@ impl<T, U> SimHash<T, U> {
     {
         let mut counts = [0i64; 64];
         for hash in iter.map(|item| self.get_hash(&item)) {
-            for i in 0..64 {
+            for (i, count) in counts.iter_mut().enumerate() {
                 if (hash >> i) & 1 == 0 {
-                    counts[i] += 1;
+                    *count += 1;
                 } else {
-                    counts[i] -= 1;
+                    *count -= 1;
                 }
             }
         }
@@ -141,7 +141,7 @@ impl<T, U> SimHash<T, U> {
 
         for _ in 0..64 {
             sim_hashes.sort();
-            for i in 0..sim_hashes.len() - window_size + 1 {
+            for i in 0..=sim_hashes.len() - window_size {
                 for j in i..i + window_size {
                     for k in j + 1..i + window_size {
                         similarities.insert((
@@ -158,6 +158,12 @@ impl<T, U> SimHash<T, U> {
         }
 
         Vec::from_iter(similarities.into_iter())
+    }
+}
+
+impl<T, U> Default for SimHash<T, U> {
+    fn default() -> SimHash<T, U> {
+        SimHash::new()
     }
 }
 

@@ -58,8 +58,12 @@ impl<T, U> MinHash<T, U> {
     ///
     /// let min_hash = MinHash::new(100);
     ///
-    /// let shingles = ShingleIterator::new(2, "the cat sat on a mat".split(' ').collect());
-    /// let min_hashes = min_hash.get_min_hashes(shingles);
+    /// let shingles1 = ShingleIterator::new(2, "the cat sat on a mat".split(' ').collect());
+    /// let shingles2 = ShingleIterator::new(2, "the cat sat on the mat".split(' ').collect());
+    /// let min_hashes1 = min_hash.get_min_hashes(shingles1);
+    /// let min_hashes2 = min_hash.get_min_hashes(shingles2);
+    ///
+    /// assert_eq!(min_hash.get_similarity_from_hashes(&min_hashes1, &min_hashes2), 0.42);
     /// ```
     pub fn get_min_hashes(&self, iter: T) -> Vec<u64>
     where
@@ -84,7 +88,7 @@ impl<T, U> MinHash<T, U> {
     ///
     /// # Panics
     ///
-    /// Panics if the length of the two 
+    /// Panics if the length of the two hashes are not equal.
     ///
     /// # Examples
     ///
@@ -93,13 +97,17 @@ impl<T, U> MinHash<T, U> {
     ///
     /// let min_hash = MinHash::new(100);
     ///
-    /// let shingles = ShingleIterator::new(2, "the cat sat on a mat".split(' ').collect());
-    /// let min_hashes = min_hash.get_min_hashes(shingles);
+    /// let shingles1 = ShingleIterator::new(2, "the cat sat on a mat".split(' ').collect());
+    /// let shingles2 = ShingleIterator::new(2, "the cat sat on the mat".split(' ').collect());
+    /// let min_hashes1 = min_hash.get_min_hashes(shingles1);
+    /// let min_hashes2 = min_hash.get_min_hashes(shingles2);
+    ///
+    /// assert_eq!(min_hash.get_similarity_from_hashes(&min_hashes1, &min_hashes2), 0.42);
     /// ```
     pub fn get_similarity_from_hashes(
         &self,
-        min_hashes_1: Vec<u64>,
-        min_hashes_2: Vec<u64>,
+        min_hashes_1: &[u64],
+        min_hashes_2: &[u64],
     ) -> f64 {
         assert_eq!(min_hashes_1.len(), min_hashes_2.len());
         let matches: u64 = min_hashes_1
@@ -107,9 +115,9 @@ impl<T, U> MinHash<T, U> {
             .zip(min_hashes_2.iter())
             .map(|(min_hash_1, min_hash_2)| {
                 if min_hash_1 == min_hash_2 {
-                    return 1;
+                    1
                 } else {
-                    return 0;
+                    0
                 }
             }).sum();
 
@@ -139,7 +147,7 @@ impl<T, U> MinHash<T, U> {
         T: Iterator<Item = U>,
         U: Hash,
     {
-        self.get_similarity_from_hashes(self.get_min_hashes(iter_1), self.get_min_hashes(iter_2))
+        self.get_similarity_from_hashes(&self.get_min_hashes(iter_1), &self.get_min_hashes(iter_2))
     }
 
     /// Returns the number of hash functions being used in `MinHash`.
