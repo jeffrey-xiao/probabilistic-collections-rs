@@ -63,7 +63,10 @@ impl<T, U> MinHash<T, U> {
     /// let min_hashes1 = min_hash.get_min_hashes(shingles1);
     /// let min_hashes2 = min_hash.get_min_hashes(shingles2);
     ///
-    /// assert_eq!(min_hash.get_similarity_from_hashes(&min_hashes1, &min_hashes2), 0.42);
+    /// assert_eq!(
+    ///     min_hash.get_similarity_from_hashes(&min_hashes1, &min_hashes2),
+    ///     0.42
+    /// );
     /// ```
     pub fn get_min_hashes(&self, iter: T) -> Vec<u64>
     where
@@ -102,24 +105,25 @@ impl<T, U> MinHash<T, U> {
     /// let min_hashes1 = min_hash.get_min_hashes(shingles1);
     /// let min_hashes2 = min_hash.get_min_hashes(shingles2);
     ///
-    /// assert_eq!(min_hash.get_similarity_from_hashes(&min_hashes1, &min_hashes2), 0.42);
+    /// assert_eq!(
+    ///     min_hash.get_similarity_from_hashes(&min_hashes1, &min_hashes2),
+    ///     0.42
+    /// );
     /// ```
-    pub fn get_similarity_from_hashes(
-        &self,
-        min_hashes_1: &[u64],
-        min_hashes_2: &[u64],
-    ) -> f64 {
+    pub fn get_similarity_from_hashes(&self, min_hashes_1: &[u64], min_hashes_2: &[u64]) -> f64 {
         assert_eq!(min_hashes_1.len(), min_hashes_2.len());
         let matches: u64 = min_hashes_1
             .iter()
             .zip(min_hashes_2.iter())
-            .map(|(min_hash_1, min_hash_2)| {
-                if min_hash_1 == min_hash_2 {
-                    1
-                } else {
-                    0
-                }
-            }).sum();
+            .map(
+                |(min_hash_1, min_hash_2)| {
+                    if min_hash_1 == min_hash_2 {
+                        1
+                    } else {
+                        0
+                    }
+                },
+            ).sum();
 
         (matches as f64) / (self.hasher_count as f64)
     }

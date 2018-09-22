@@ -85,7 +85,10 @@ impl<T> QuotientFilter<T> {
     }
 
     fn get_quotient_and_remainder(&self, hash: u64) -> (usize, u64) {
-        (((hash >> self.remainder_bits) & self.quotient_mask) as usize, hash & self.remainder_mask)
+        (
+            ((hash >> self.remainder_bits) & self.quotient_mask) as usize,
+            hash & self.remainder_mask,
+        )
     }
 
     fn increment_index(&self, index: &mut usize) {
@@ -389,7 +392,7 @@ impl<T> QuotientFilter<T> {
                     if slot & CONTINUATION_MASK == 0 {
                         break;
                     }
-                }
+                },
             }
         }
 
@@ -441,7 +444,7 @@ impl<T> QuotientFilter<T> {
                     if slot & CONTINUATION_MASK == 0 {
                         return;
                     }
-                }
+                },
             }
         }
 
@@ -470,7 +473,6 @@ impl<T> QuotientFilter<T> {
                     self.set_slot(quotient, canonical_slot);
                 }
             }
-
             // if first item is a start of a run, the next item must be a start of a run. The
             // next item is either already a start of a run or the new start of the removed
             // item's run
@@ -618,7 +620,7 @@ impl<T> QuotientFilter<T> {
     /// ```
     pub fn estimated_fpp(&self) -> f64 {
         let fill_ratio = self.len() as f64 / self.capacity() as f64;
-        1.0 - consts::E.powf(- fill_ratio / 2.0f64.powf(f64::from(self.remainder_bits)))
+        1.0 - consts::E.powf(-fill_ratio / 2.0f64.powf(f64::from(self.remainder_bits)))
     }
 }
 
