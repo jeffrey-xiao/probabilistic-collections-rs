@@ -1,4 +1,4 @@
-//! Module for measuring similarities between sets.
+//! Locality-sensitive hashing schemes for measuring similarities between sets.
 
 mod min_hash;
 mod sim_hash;

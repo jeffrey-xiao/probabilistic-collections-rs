@@ -1,4 +1,4 @@
-//! Space-efficient probabilistic data structure to count the number of distinct items in a
+//! Space-efficient probabilistic data structure for estimating the number of distinct items in a
 //! multiset.
 
 use rand::{Rng, XorShiftRng};

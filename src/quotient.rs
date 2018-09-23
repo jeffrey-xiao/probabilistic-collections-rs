@@ -1,4 +1,4 @@
-//! Space-efficient probabilistic data structure to test for membership in a set.
+//! Space-efficient probabilistic data structure for approximate membership queries in a set.
 
 use rand::{Rng, XorShiftRng};
 use siphasher::sip::SipHasher;

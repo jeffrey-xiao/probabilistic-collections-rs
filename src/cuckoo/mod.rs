@@ -1,5 +1,5 @@
-//! Space-efficient probabilistic data structure to test for membership in a set with the ability
-//! to remove items.
+//! Space-efficient probabilistic data structure for approximate membership queries in a set with
+//! the ability to remove items.
 
 mod cuckoo_filter;
 mod scalable_cuckoo_filter;
