@@ -366,8 +366,8 @@ impl<T> QuotientFilter<T> {
         let (quotient, remainder) = self.get_quotient_and_remainder(self.get_hash(item));
         let slot = self.get_slot(quotient);
 
-        // empty slot
-        if slot & METADATA_MASK == 0 {
+        // no such run exists
+        if slot & OCCUPIED_MASK == 0 {
             return false;
         }
 
