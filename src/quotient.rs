@@ -635,6 +635,7 @@ impl<T> fmt::Debug for QuotientFilter<T> {
     }
 }
 
+#[cfg(test)]
 mod tests {
     extern crate rand;
 
