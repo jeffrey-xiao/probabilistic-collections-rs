@@ -83,7 +83,8 @@ impl<T, U> MinHash<T, U> {
                     .map(|hashes| util::get_hash(index, hashes))
                     .min()
                     .expect("Expected non-zero `hasher_count` and shingles.")
-            }).collect()
+            })
+            .collect()
     }
 
     /// Returns the estimated Jaccard Similarity measure from the minimum hashes of two iterators.
@@ -123,7 +124,8 @@ impl<T, U> MinHash<T, U> {
                         0
                     }
                 },
-            ).sum();
+            )
+            .sum();
 
         (matches as f64) / (self.hasher_count as f64)
     }
