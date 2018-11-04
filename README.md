@@ -24,6 +24,10 @@ and this to your crate root:
 extern crate probabilistic_collections;
 ```
 
+## Changelog
+
+See [CHANGELOG](CHANGELOG.md) for more details.
+
 ## References
 
  - [Advanced Bloom Filter Based Algorithms for Efficient Approximate Data De-Duplication in Streams](https://arxiv.org/abs/1212.3964)
