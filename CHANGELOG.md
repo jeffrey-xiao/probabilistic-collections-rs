@@ -1,6 +1,18 @@
 # Changelog
 
-## 0.4.0
+## 0.5.0 - 2018-11-03
+
+### Added
+
+ - `quotient` module with `QuotientFilter`.
+
+### Changed
+
+ - Refactor tests to use macros.
+ - More consistent error messages.
+ - Rename `estimate_fpp` to `estimated_fpp`.
+
+## 0.4.0 - 2018-09-08
 
 ### Added
 
@@ -10,21 +22,21 @@
 
  - Abstract out common hash utility functions.
 
-## 0.3.0
+## 0.3.0 - 2018-09-08
 
 ### Changed
 
  - All types are now generic over a single type.
  - API uses `Borrow` instead of `&` where applicable.
 
-## 0.2.0
+## 0.2.0 - 2018-09-07
 
 ### Added
 
  - `CountMinSketch` with four different counting strategies: `CountMinStrategy`, `CountMeanStrategy`
    and `CountMedianBiasStrategy`. 
 
-## 0.1.0
+## 0.1.0 - 2018-09-06
 
 ### Added
 
