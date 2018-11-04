@@ -143,11 +143,14 @@ impl<T> HyperLogLog<T> {
 
     fn get_estimate(&self) -> f64 {
         let len = self.registers.len() as f64;
-        1.0 / (self.alpha * len * len * self
-            .registers
-            .iter()
-            .map(|value| 1.0 / 2.0f64.powi(i32::from(*value)))
-            .sum::<f64>())
+        1.0 / (self.alpha
+            * len
+            * len
+            * self
+                .registers
+                .iter()
+                .map(|value| 1.0 / 2.0f64.powi(i32::from(*value)))
+                .sum::<f64>())
     }
 
     /// Returns the estimated number of distinct items in the `HyperLogLog<T>`.
