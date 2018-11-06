@@ -589,10 +589,10 @@ mod tests {
 
     #[test]
     fn test_get_fingerprint() {
-        let fingerprint = CuckooFilter::<String>::get_fingerprint(0x7FBFDFEFF7FBFDFE);
+        let fingerprint = CuckooFilter::<String>::get_fingerprint(0x7FBF_DFEF_F7FB_FDFE);
         assert_eq!(
             CuckooFilter::<String>::get_raw_fingerprint(&fingerprint),
-            0x7FBFDFEFF7FBFDFE
+            0x7FBF_DFEF_F7FB_FDFE,
         );
     }
 
@@ -601,7 +601,7 @@ mod tests {
         let fingerprint = vec![0xFF, 0xFF];
         assert_eq!(
             CuckooFilter::<String>::get_raw_fingerprint(&fingerprint),
-            0xFFFF
+            0xFFFF,
         );
     }
 

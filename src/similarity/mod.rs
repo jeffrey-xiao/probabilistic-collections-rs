@@ -103,26 +103,24 @@ where
 #[cfg(test)]
 mod tests {
     use super::{get_jaccard_similarity, ShingleIterator};
+    use std::f64;
+
     static S1: &'static str = "the cat sat on a mat";
     static S2: &'static str = "the cat sat on the mat";
     static S3: &'static str = "we all scream for ice cream";
 
     #[test]
     fn test_jaccard_similarity() {
-        assert_eq!(
-            get_jaccard_similarity(
-                ShingleIterator::new(2, S1.split(' ').collect()),
-                ShingleIterator::new(2, S2.split(' ').collect()),
-            ),
-            3.0 / 7.0,
+        let similarity = get_jaccard_similarity(
+            ShingleIterator::new(2, S1.split(' ').collect()),
+            ShingleIterator::new(2, S2.split(' ').collect()),
         );
+        assert!(f64::abs(similarity - 3.0 / 7.0) < f64::EPSILON);
 
-        assert_eq!(
-            get_jaccard_similarity(
-                ShingleIterator::new(2, S1.split(' ').collect()),
-                ShingleIterator::new(2, S3.split(' ').collect()),
-            ),
-            0.0 / 7.0,
+        let similarity = get_jaccard_similarity(
+            ShingleIterator::new(2, S1.split(' ').collect()),
+            ShingleIterator::new(2, S3.split(' ').collect()),
         );
+        assert!(f64::abs(similarity - 0.0 / 7.0) < f64::EPSILON);
     }
 }

@@ -841,7 +841,7 @@ mod tests {
 
     #[test]
     fn test_from_bytes() {
-        let bv = BitVec::from_bytes(&[0b11010000]);
+        let bv = BitVec::from_bytes(&[0b1101_0000]);
         assert_eq!(
             bv.iter().collect::<Vec<bool>>(),
             vec![true, true, false, true, false, false, false, false],
@@ -857,7 +857,7 @@ mod tests {
         bv.set(1, true);
         bv.set(3, true);
 
-        assert_eq!(bv.to_bytes(), vec![0b11010000]);
+        assert_eq!(bv.to_bytes(), vec![0b1101_0000]);
     }
 
     #[test]
@@ -1080,7 +1080,7 @@ mod tests {
 
     #[test]
     fn test_clone() {
-        let bv = BitVec::from_bytes(&[0b11010000]);
+        let bv = BitVec::from_bytes(&[0b1101_0000]);
         let mut cloned = BitVec::new(0);
 
         assert_eq!(
@@ -1097,7 +1097,7 @@ mod tests {
 
     #[test]
     fn test_iter() {
-        let bv = BitVec::from_bytes(&[0b11010000]);
+        let bv = BitVec::from_bytes(&[0b1101_0000]);
 
         assert_eq!(
             (&bv).into_iter().collect::<Vec<bool>>(),

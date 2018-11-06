@@ -175,6 +175,7 @@ impl<T, U> MinHash<T, U> {
 mod tests {
     use super::MinHash;
     use similarity::ShingleIterator;
+    use std::f64;
 
     static S1: &'static str = "the cat sat on a mat";
     static S2: &'static str = "the cat sat on the mat";
@@ -184,21 +185,17 @@ mod tests {
     fn test_min_hash() {
         let min_hash = MinHash::new(100);
 
-        assert_eq!(
-            min_hash.get_similarity(
-                ShingleIterator::new(2, S1.split(' ').collect()),
-                ShingleIterator::new(2, S2.split(' ').collect()),
-            ),
-            0.42,
+        let similarity = min_hash.get_similarity(
+            ShingleIterator::new(2, S1.split(' ').collect()),
+            ShingleIterator::new(2, S2.split(' ').collect()),
         );
+        assert!(f64::abs(similarity - 0.42) < f64::EPSILON);
 
-        assert_eq!(
-            min_hash.get_similarity(
-                ShingleIterator::new(2, S1.split(' ').collect()),
-                ShingleIterator::new(2, S3.split(' ').collect()),
-            ),
-            0.00,
+        let similarity = min_hash.get_similarity(
+            ShingleIterator::new(2, S1.split(' ').collect()),
+            ShingleIterator::new(3, S2.split(' ').collect()),
         );
+        assert!(f64::abs(similarity - 0.00) < f64::EPSILON);
 
         assert_eq!(min_hash.hasher_count(), 100);
     }
