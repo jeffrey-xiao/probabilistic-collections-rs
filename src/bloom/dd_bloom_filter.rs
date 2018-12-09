@@ -1,11 +1,11 @@
-use bit_vec::BitVec;
+use crate::bit_vec::BitVec;
+use crate::util;
 use rand::{Rng, XorShiftRng};
 use siphasher::sip::SipHasher;
 use std::borrow::Borrow;
 use std::f64::consts;
 use std::hash::Hash;
 use std::marker::PhantomData;
-use util;
 
 const PRIME: u64 = 0xFFFF_FFFF_FFFF_FFC5;
 

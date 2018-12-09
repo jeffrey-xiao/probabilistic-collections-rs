@@ -1,5 +1,6 @@
 //! Growable list of bits.
 
+use serde_derive::{Deserialize, Serialize};
 use std::mem;
 use std::ops::{Index, Range};
 use std::slice;
@@ -603,13 +604,13 @@ impl BitVec {
         self.set(index, bit);
     }
 
-    fn blocks(&self) -> Blocks {
+    fn blocks(&self) -> Blocks<'_> {
         Blocks {
             iter: self.blocks.iter(),
         }
     }
 
-    fn blocks_mut(&mut self) -> BlocksMut {
+    fn blocks_mut(&mut self) -> BlocksMut<'_> {
         self.blocks.iter_mut()
     }
 
@@ -625,7 +626,7 @@ impl BitVec {
     /// bv.push(true);
     /// assert_eq!(bv.iter().collect::<Vec<bool>>(), vec![false, true]);
     /// ```
-    pub fn iter(&self) -> BitVecIter {
+    pub fn iter(&self) -> BitVecIter<'_> {
         BitVecIter {
             bit_vec: self,
             range: 0..self.len,

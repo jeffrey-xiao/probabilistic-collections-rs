@@ -1,17 +1,17 @@
 //! Space-efficient probabilistic data structure for estimating the number of item occurrences.
 
+use crate::util;
 use siphasher::sip::SipHasher;
 use std::borrow::Borrow;
 use std::hash::Hash;
 use std::marker::PhantomData;
-use util;
 
 /// Trait for types that have the logic for estimating the number of item occurrences.
 pub trait CountStrategy {
     /// Returns the estimated number of item occurrences given the number of items in the
     /// `CountMinSketch`, the rows in the grid, the columns in the grid, and the values
     /// corresponding to the item in the grid
-    fn get_estimate(items: i64, rows: usize, cols: usize, iter: ItemValueIter) -> i64;
+    fn get_estimate(items: i64, rows: usize, cols: usize, iter: ItemValueIter<'_>) -> i64;
 }
 
 /// A count strategy that uses the minimum value to estimate the number of item occurrences. This
@@ -19,7 +19,7 @@ pub trait CountStrategy {
 pub struct CountMinStrategy;
 
 impl CountStrategy for CountMinStrategy {
-    fn get_estimate(_items: i64, _rows: usize, _cols: usize, iter: ItemValueIter) -> i64 {
+    fn get_estimate(_items: i64, _rows: usize, _cols: usize, iter: ItemValueIter<'_>) -> i64 {
         iter.min()
             .expect("Expected `CountMinSketch` to be non-empty.")
     }
@@ -30,7 +30,7 @@ impl CountStrategy for CountMinStrategy {
 pub struct CountMeanStrategy;
 
 impl CountStrategy for CountMeanStrategy {
-    fn get_estimate(_items: i64, rows: usize, _cols: usize, iter: ItemValueIter) -> i64 {
+    fn get_estimate(_items: i64, rows: usize, _cols: usize, iter: ItemValueIter<'_>) -> i64 {
         (iter.sum::<i64>() as f64 / rows as f64).round() as i64
     }
 }
@@ -42,7 +42,7 @@ impl CountStrategy for CountMeanStrategy {
 pub struct CountMedianBiasStrategy;
 
 impl CountStrategy for CountMedianBiasStrategy {
-    fn get_estimate(items: i64, rows: usize, cols: usize, iter: ItemValueIter) -> i64 {
+    fn get_estimate(items: i64, rows: usize, cols: usize, iter: ItemValueIter<'_>) -> i64 {
         let min_count = CountMinStrategy::get_estimate(items, rows, cols, iter.clone());
         let mut items_with_bias: Vec<i64> = iter
             .map(|value| value - ((items - value) as f64 / (cols - 1) as f64).ceil() as i64)

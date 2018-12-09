@@ -1,4 +1,4 @@
-use cuckoo::{CuckooFilter, DEFAULT_ENTRIES_PER_INDEX};
+use crate::cuckoo::{CuckooFilter, DEFAULT_ENTRIES_PER_INDEX};
 use std::borrow::Borrow;
 use std::hash::Hash;
 

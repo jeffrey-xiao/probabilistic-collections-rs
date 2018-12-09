@@ -1,4 +1,5 @@
-use bit_vec::BitVec;
+use crate::bit_vec::BitVec;
+use crate::util;
 use serde::de::{self, Deserialize, Deserializer, MapAccess, SeqAccess, Visitor};
 use serde::ser::{Serialize, SerializeStruct, Serializer};
 use siphasher::sip::SipHasher;
@@ -6,7 +7,6 @@ use std::borrow::Borrow;
 use std::fmt;
 use std::hash::Hash;
 use std::marker::PhantomData;
-use util;
 
 /// A space-efficient probabilistic data structure to test for membership in a set.
 ///
@@ -319,7 +319,7 @@ impl<'de, T> Deserialize<'de> for BloomFilter<T> {
                 impl<'de> Visitor<'de> for FieldVisitor {
                     type Value = Field;
 
-                    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
                         formatter.write_str("`hasher_count`, `keys_0`, `keys_1`, or `bit_vec`")
                     }
 
@@ -346,7 +346,7 @@ impl<'de, T> Deserialize<'de> for BloomFilter<T> {
         impl<'de, T> Visitor<'de> for BloomFilterVisitor<T> {
             type Value = BloomFilter<T>;
 
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
                 formatter.write_str("struct BloomFilter")
             }
 

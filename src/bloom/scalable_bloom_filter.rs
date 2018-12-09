@@ -1,4 +1,4 @@
-use bloom::BloomFilter;
+use crate::bloom::BloomFilter;
 use std::borrow::Borrow;
 use std::hash::Hash;
 

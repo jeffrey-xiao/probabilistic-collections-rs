@@ -8,11 +8,12 @@ repository = "https://gitlab.com/jeffrey-xiao/probabilistic-collections-rs"
 documentation = "https://docs.rs/probabilistic-collections"
 description = """
 Various implementations of collections that use randomization to improve on running time or memory,
-but introduce a certain amount of error
+but introduce a certain amount of error.
 """
 categories = ["algorithms", "data-structures"]
 keywords = ["collections", "data-structures", "probabilistic"]
 include = ["src/**/*", "Cargo.toml"]
+edition = "2018"
 
 [badges]
 travis-ci = { repository = "jeffrey-xiao/probabilistic-collections-rs", branch = "master" }

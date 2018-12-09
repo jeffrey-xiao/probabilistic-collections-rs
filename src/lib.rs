@@ -19,10 +19,14 @@
 //! [dependencies]
 //! probabilistic-collections = "*"
 //! ```
-//! and this to your crate root:
+//! and this to your crate root if you are using Rust 2015:
 //! ```rust
 //! extern crate probabilistic_collections;
 //! ```
+//!
+//! ## Changelog
+//!
+//! See [CHANGELOG](CHANGELOG.md) for more details.
 //!
 //! ## References
 //!
@@ -55,13 +59,6 @@
 //! See [LICENSE-APACHE](LICENSE-APACHE) and [LICENSE-MIT](LICENSE-MIT) for more details.
 
 #![warn(missing_docs)]
-
-extern crate bincode;
-extern crate rand;
-extern crate serde;
-#[macro_use]
-extern crate serde_derive;
-extern crate siphasher;
 
 pub mod bit_array_vec;
 pub mod bit_vec;

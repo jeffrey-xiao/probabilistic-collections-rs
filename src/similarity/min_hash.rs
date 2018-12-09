@@ -1,7 +1,7 @@
+use crate::util;
 use siphasher::sip::SipHasher;
 use std::hash::Hash;
 use std::marker::PhantomData;
-use util;
 
 /// `MinHash` is a locality sensitive hashing scheme that can estimate the Jaccard Similarity
 /// measure between two sets `s1` and `s2`. It uses multiple hash functions and for each hash
@@ -174,7 +174,7 @@ impl<T, U> MinHash<T, U> {
 #[cfg(test)]
 mod tests {
     use super::MinHash;
-    use similarity::ShingleIterator;
+    use crate::similarity::ShingleIterator;
     use std::f64;
 
     static S1: &'static str = "the cat sat on a mat";
@@ -193,7 +193,7 @@ mod tests {
 
         let similarity = min_hash.get_similarity(
             ShingleIterator::new(2, S1.split(' ').collect()),
-            ShingleIterator::new(3, S2.split(' ').collect()),
+            ShingleIterator::new(2, S3.split(' ').collect()),
         );
         assert!(f64::abs(similarity - 0.00) < f64::EPSILON);
 

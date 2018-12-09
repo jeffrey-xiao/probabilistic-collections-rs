@@ -1,9 +1,9 @@
-use bit_vec::BitVec;
+use crate::bit_vec::BitVec;
+use crate::util;
 use siphasher::sip::SipHasher;
 use std::borrow::Borrow;
 use std::hash::Hash;
 use std::marker::PhantomData;
-use util;
 
 /// A space-efficient probabilistic data structure to test for membership in a set.
 ///

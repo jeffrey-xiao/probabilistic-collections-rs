@@ -170,7 +170,7 @@ impl<T, U> Default for SimHash<T, U> {
 #[cfg(test)]
 mod tests {
     use super::SimHash;
-    use similarity::ShingleIterator;
+    use crate::similarity::ShingleIterator;
 
     static S1: &'static str = "the cat sat on a mat";
     static S2: &'static str = "the cat sat on the mat";

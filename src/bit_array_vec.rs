@@ -382,7 +382,7 @@ impl BitArrayVec {
     ///
     /// assert_eq!(bav.iter().collect::<Vec<Vec<u8>>>(), vec![vec![0], vec![1]]);
     /// ```
-    pub fn iter(&self) -> BitArrayVecIter {
+    pub fn iter(&self) -> BitArrayVecIter<'_> {
         BitArrayVecIter {
             bit_array_vec: self,
             range: 0..self.len,

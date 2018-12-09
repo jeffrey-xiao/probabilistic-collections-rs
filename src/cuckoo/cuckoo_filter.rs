@@ -1,12 +1,12 @@
-use bit_array_vec::BitArrayVec;
-use cuckoo::{DEFAULT_ENTRIES_PER_INDEX, DEFAULT_FINGERPRINT_BIT_COUNT, DEFAULT_MAX_KICKS};
+use crate::bit_array_vec::BitArrayVec;
+use crate::cuckoo::{DEFAULT_ENTRIES_PER_INDEX, DEFAULT_FINGERPRINT_BIT_COUNT, DEFAULT_MAX_KICKS};
+use crate::util;
 use rand::{Rng, XorShiftRng};
 use siphasher::sip::SipHasher;
 use std::borrow::Borrow;
 use std::cmp;
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
-use util;
 
 /// A space-efficient probabilistic data structure to test for membership in a set. Cuckoo filters
 /// also provide the flexibility to remove items.

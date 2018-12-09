@@ -626,7 +626,7 @@ impl<T> QuotientFilter<T> {
 
 use std::fmt;
 impl<T> fmt::Debug for QuotientFilter<T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for i in 0..self.capacity() {
             let slot = self.get_slot(i);
             write!(f, "{}|{}:{:03b} ", i, slot >> 3, slot & METADATA_MASK)?;
@@ -637,10 +637,8 @@ impl<T> fmt::Debug for QuotientFilter<T> {
 
 #[cfg(test)]
 mod tests {
-    extern crate rand;
-
-    use self::rand::{thread_rng, Rng};
     use super::QuotientFilter;
+    use rand::{thread_rng, Rng};
 
     #[test]
     fn test_new() {

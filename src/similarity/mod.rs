@@ -28,7 +28,7 @@ use std::iter::FromIterator;
 /// ```
 pub struct ShingleIterator<'a, T>
 where
-    T: 'a + ?Sized,
+    T: ?Sized,
 {
     token_count: usize,
     index: usize,
