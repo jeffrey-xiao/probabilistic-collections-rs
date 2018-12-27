@@ -28,8 +28,8 @@ addons:
 
 before_script:
   - rustup install nightly
-  - rustup component add clippy-preview --toolchain nightly
-  - rustup component add rustfmt-preview --toolchain nightly
+  - rustup component add clippy --toolchain nightly
+  - rustup component add rustfmt --toolchain nightly
 
 script:
   - cargo build --verbose --all-targets
