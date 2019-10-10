@@ -392,7 +392,7 @@ impl<T> QuotientFilter<T> {
                     if slot & CONTINUATION_MASK == 0 {
                         break;
                     }
-                },
+                }
             }
         }
 
@@ -444,7 +444,7 @@ impl<T> QuotientFilter<T> {
                     if slot & CONTINUATION_MASK == 0 {
                         return;
                     }
-                },
+                }
             }
         }
 

@@ -177,7 +177,7 @@ impl<T> HyperLogLog<T> {
                     .map(|value| if *value == 0 { 1 } else { 0 })
                     .sum::<u64>();
                 len * (len / zeros as f64).ln()
-            },
+            }
             x if x <= 1.0 / 3.0 * 2.0f64.powi(32) => x,
             x => -(2.0f64.powi(32)) * (1.0 - x / 2.0f64.powi(32)).ln(),
         }

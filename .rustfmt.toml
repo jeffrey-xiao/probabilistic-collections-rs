@@ -1,13 +1,3 @@
-combine_control_expr = false
-comment_width = 100
-error_on_line_overflow = true
-imports_layout = "HorizontalVertical"
-match_block_trailing_comma = true
-max_width = 100
-force_multiline_blocks = true
-normalize_comments = true
-reorder_impl_items = true
+newline_style = "Unix"
 use_field_init_shorthand = true
 use_try_shorthand = true
-format_doc_comments = true
-wrap_comments = true

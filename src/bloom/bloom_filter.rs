@@ -392,25 +392,25 @@ impl<'de, T> Deserialize<'de> for BloomFilter<T> {
                                 return Err(de::Error::duplicate_field("hasher_count"));
                             }
                             hasher_count = Some(map.next_value()?);
-                        },
+                        }
                         Field::Keys0 => {
                             if keys_0.is_some() {
                                 return Err(de::Error::duplicate_field("keys_0"));
                             }
                             keys_0 = Some(map.next_value()?);
-                        },
+                        }
                         Field::Keys1 => {
                             if keys_1.is_some() {
                                 return Err(de::Error::duplicate_field("keys_1"));
                             }
                             keys_1 = Some(map.next_value()?);
-                        },
+                        }
                         Field::BitVec => {
                             if bit_vec.is_some() {
                                 return Err(de::Error::duplicate_field("bit_vec"));
                             }
                             bit_vec = Some(map.next_value()?);
-                        },
+                        }
                     }
                 }
                 let hasher_count =

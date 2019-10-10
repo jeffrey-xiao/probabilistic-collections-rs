@@ -27,15 +27,15 @@ addons:
       - libiberty-dev
 
 before_script:
-  - rustup install nightly
-  - rustup component add clippy --toolchain nightly
-  - rustup component add rustfmt --toolchain nightly
+  - rustup install stable
+  - rustup component add clippy --toolchain stable
+  - rustup component add rustfmt --toolchain stable
 
 script:
   - cargo build --verbose --all-targets
-  - cargo +nightly fmt --verbose --all -- --verbose --check
-  - cargo +nightly clippy --verbose --all-targets
-  - cargo test --verbose --all-targets
+  - cargo +stable fmt --verbose --all -- --verbose --check
+  - cargo +stable clippy --verbose --all-targets
+  - cargo test --verbose
 
 after_success:
   - |

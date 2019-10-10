@@ -177,9 +177,9 @@ mod tests {
     use crate::similarity::ShingleIterator;
     use std::f64;
 
-    static S1: &'static str = "the cat sat on a mat";
-    static S2: &'static str = "the cat sat on the mat";
-    static S3: &'static str = "we all scream for ice cream";
+    static S1: &str = "the cat sat on a mat";
+    static S2: &str = "the cat sat on the mat";
+    static S3: &str = "we all scream for ice cream";
 
     #[test]
     fn test_min_hash() {

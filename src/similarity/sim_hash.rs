@@ -153,7 +153,7 @@ impl<T, U> SimHash<T, U> {
             }
 
             for sim_hash in &mut sim_hashes {
-                sim_hash.0.rotate_left(1);
+                sim_hash.0 = sim_hash.0.rotate_left(1);
             }
         }
 
@@ -172,9 +172,9 @@ mod tests {
     use super::SimHash;
     use crate::similarity::ShingleIterator;
 
-    static S1: &'static str = "the cat sat on a mat";
-    static S2: &'static str = "the cat sat on the mat";
-    static S3: &'static str = "we all scream for ice cream";
+    static S1: &str = "the cat sat on a mat";
+    static S2: &str = "the cat sat on the mat";
+    static S3: &str = "we all scream for ice cream";
 
     #[test]
     fn test_sim_hash() {
