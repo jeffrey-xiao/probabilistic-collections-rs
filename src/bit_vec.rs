@@ -1,6 +1,6 @@
 //! Growable list of bits.
 
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::mem;
 use std::ops::{Index, Range};
 use std::slice;
