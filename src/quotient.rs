@@ -1,6 +1,7 @@
 //! Space-efficient probabilistic data structure for approximate membership queries in a set.
 
 use rand::{Rng, XorShiftRng};
+use serde::{Deserialize, Serialize};
 use siphasher::sip::SipHasher;
 use std::borrow::Borrow;
 use std::cmp::Ordering;
@@ -45,6 +46,7 @@ const METADATA_BITS: u8 = 3;
 /// assert_eq!(filter.quotient_bits(), 8);
 /// assert_eq!(filter.remainder_bits(), 4);
 /// ```
+#[derive(Deserialize, Serialize)]
 pub struct QuotientFilter<T> {
     quotient_bits: u8,
     remainder_bits: u8,
@@ -638,6 +640,7 @@ impl<T> fmt::Debug for QuotientFilter<T> {
 #[cfg(test)]
 mod tests {
     use super::QuotientFilter;
+    use bincode;
     use rand::{thread_rng, Rng};
 
     #[test]
@@ -715,6 +718,31 @@ mod tests {
         assert!(!filter.contains("qux"));
         assert!(!filter.contains("foobar"));
         assert!(!filter.contains("barfoo"));
+    }
+
+    #[test]
+    fn test_ser_de() {
+        let mut filter = QuotientFilter::<String>::new(8, 4);
+        filter.insert("foo");
+
+        let serialized_filter = bincode::serialize(&filter).unwrap();
+        let de_filter: QuotientFilter<String> = bincode::deserialize(&serialized_filter).unwrap();
+
+        assert!(de_filter.contains("foo"));
+        assert_eq!(filter.quotient_bits, de_filter.quotient_bits);
+        assert_eq!(filter.remainder_bits, de_filter.remainder_bits);
+        assert_eq!(filter.slot_bits, de_filter.slot_bits);
+        assert_eq!(filter.quotient_mask, de_filter.quotient_mask);
+        assert_eq!(filter.remainder_mask, de_filter.remainder_mask);
+        assert_eq!(filter.slot_mask, de_filter.slot_mask);
+        assert_eq!(filter.table, de_filter.table);
+        assert_eq!(filter.len, de_filter.len);
+        // SipHasher doesn't implement PartialEq, but it does implement Debug,
+        // and its Debug impl does print all internal state.
+        assert_eq!(
+            format!("{:?}", filter.hasher),
+            format!("{:?}", de_filter.hasher)
+        );
     }
 
     #[test]
