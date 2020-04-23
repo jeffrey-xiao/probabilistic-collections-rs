@@ -1,10 +1,8 @@
 use crate::bit_vec::BitVec;
 use crate::util;
-use serde::de::{self, Deserialize, Deserializer, MapAccess, SeqAccess, Visitor};
-use serde::ser::{Serialize, SerializeStruct, Serializer};
+use serde::{Deserialize, Serialize};
 use siphasher::sip::SipHasher;
 use std::borrow::Borrow;
-use std::fmt;
 use std::hash::Hash;
 use std::marker::PhantomData;
 
@@ -34,7 +32,7 @@ use std::marker::PhantomData;
 /// assert_eq!(filter.len(), 96);
 /// assert_eq!(filter.hasher_count(), 7);
 /// ```
-#[derive(Clone)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct BloomFilter<T> {
     bit_vec: BitVec,
     hashers: [SipHasher; 2],
@@ -283,163 +281,9 @@ impl<T> PartialEq for BloomFilter<T> {
     }
 }
 
-impl<T> Serialize for BloomFilter<T> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut state = serializer.serialize_struct("BloomFilter", 4)?;
-        state.serialize_field("hasher_count", &self.hasher_count)?;
-        state.serialize_field("keys_0", &self.hashers[0].keys())?;
-        state.serialize_field("keys_1", &self.hashers[1].keys())?;
-        state.serialize_field("bit_vec", &self.bit_vec)?;
-        state.end()
-    }
-}
-
-impl<'de, T> Deserialize<'de> for BloomFilter<T> {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        enum Field {
-            HasherCount,
-            Keys0,
-            Keys1,
-            BitVec,
-        };
-
-        impl<'de> Deserialize<'de> for Field {
-            fn deserialize<D>(deserializer: D) -> Result<Field, D::Error>
-            where
-                D: Deserializer<'de>,
-            {
-                struct FieldVisitor;
-
-                impl<'de> Visitor<'de> for FieldVisitor {
-                    type Value = Field;
-
-                    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-                        formatter.write_str("`hasher_count`, `keys_0`, `keys_1`, or `bit_vec`")
-                    }
-
-                    fn visit_str<E>(self, value: &str) -> Result<Field, E>
-                    where
-                        E: de::Error,
-                    {
-                        match value {
-                            "hasher_count" => Ok(Field::HasherCount),
-                            "keys_0" => Ok(Field::Keys0),
-                            "keys_1" => Ok(Field::Keys1),
-                            "bit_vec" => Ok(Field::BitVec),
-                            _ => Err(de::Error::unknown_field(value, FIELDS)),
-                        }
-                    }
-                }
-
-                deserializer.deserialize_identifier(FieldVisitor)
-            }
-        }
-
-        struct BloomFilterVisitor<T>(PhantomData<T>);
-
-        impl<'de, T> Visitor<'de> for BloomFilterVisitor<T> {
-            type Value = BloomFilter<T>;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-                formatter.write_str("struct BloomFilter")
-            }
-
-            fn visit_seq<V>(self, mut seq: V) -> Result<Self::Value, V::Error>
-            where
-                V: SeqAccess<'de>,
-            {
-                let hasher_count = seq
-                    .next_element()?
-                    .ok_or_else(|| de::Error::invalid_length(0, &self))?;
-                let keys_0: (u64, u64) = seq
-                    .next_element()?
-                    .ok_or_else(|| de::Error::invalid_length(1, &self))?;
-                let keys_1: (u64, u64) = seq
-                    .next_element()?
-                    .ok_or_else(|| de::Error::invalid_length(2, &self))?;
-                let bit_vec = seq
-                    .next_element()?
-                    .ok_or_else(|| de::Error::invalid_length(3, &self))?;
-                Ok(BloomFilter {
-                    hasher_count,
-                    hashers: [
-                        SipHasher::new_with_keys(keys_0.0, keys_0.1),
-                        SipHasher::new_with_keys(keys_1.0, keys_1.1),
-                    ],
-                    bit_vec,
-                    _marker: PhantomData,
-                })
-            }
-
-            fn visit_map<V>(self, mut map: V) -> Result<Self::Value, V::Error>
-            where
-                V: MapAccess<'de>,
-            {
-                let mut hasher_count = None;
-                let mut keys_0 = None;
-                let mut keys_1 = None;
-                let mut bit_vec = None;
-                while let Some(key) = map.next_key()? {
-                    match key {
-                        Field::HasherCount => {
-                            if hasher_count.is_some() {
-                                return Err(de::Error::duplicate_field("hasher_count"));
-                            }
-                            hasher_count = Some(map.next_value()?);
-                        }
-                        Field::Keys0 => {
-                            if keys_0.is_some() {
-                                return Err(de::Error::duplicate_field("keys_0"));
-                            }
-                            keys_0 = Some(map.next_value()?);
-                        }
-                        Field::Keys1 => {
-                            if keys_1.is_some() {
-                                return Err(de::Error::duplicate_field("keys_1"));
-                            }
-                            keys_1 = Some(map.next_value()?);
-                        }
-                        Field::BitVec => {
-                            if bit_vec.is_some() {
-                                return Err(de::Error::duplicate_field("bit_vec"));
-                            }
-                            bit_vec = Some(map.next_value()?);
-                        }
-                    }
-                }
-                let hasher_count =
-                    hasher_count.ok_or_else(|| de::Error::missing_field("hasher_count"))?;
-                let keys_0: (u64, u64) =
-                    keys_0.ok_or_else(|| de::Error::missing_field("keys_0"))?;
-                let keys_1: (u64, u64) =
-                    keys_1.ok_or_else(|| de::Error::missing_field("keys_1"))?;
-                let bit_vec = bit_vec.ok_or_else(|| de::Error::missing_field("bit_vec"))?;
-                Ok(BloomFilter {
-                    hasher_count,
-                    hashers: [
-                        SipHasher::new_with_keys(keys_0.0, keys_0.1),
-                        SipHasher::new_with_keys(keys_1.0, keys_1.1),
-                    ],
-                    bit_vec,
-                    _marker: PhantomData,
-                })
-            }
-        }
-        const FIELDS: &[&str] = &["hasher_count", "keys_0", "keys_1", "bit_vec"];
-        deserializer.deserialize_struct("BloomFilter", FIELDS, BloomFilterVisitor(PhantomData))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::BloomFilter;
-    use bincode::{deserialize, serialize};
 
     #[test]
     fn test_new() {
@@ -508,15 +352,19 @@ mod tests {
         let mut filter = BloomFilter::<String>::new(100, 0.01);
         filter.insert("foo");
 
-        let keys_0 = filter.hashers[0].keys();
-        let keys_1 = filter.hashers[1].keys();
+        let serialized_filter = bincode::serialize(&filter).unwrap();
+        let de_filter: BloomFilter<String> = bincode::deserialize(&serialized_filter).unwrap();
 
-        let serialized_filter = serialize(&filter).unwrap();
-        filter = deserialize(&serialized_filter).unwrap();
-
-        assert!(filter.contains("foo"));
-        assert_eq!(filter.hasher_count, 7);
-        assert_eq!(filter.hashers[0].keys(), keys_0);
-        assert_eq!(filter.hashers[1].keys(), keys_1);
+        assert!(de_filter.contains("foo"));
+        assert_eq!(filter.bit_vec, de_filter.bit_vec);
+        assert_eq!(filter.hasher_count, de_filter.hasher_count);
+        // SipHasher doesn't implement PartialEq, but it does implement Debug,
+        // and its Debug impl does print all internal state.
+        for i in 0..2 {
+            assert_eq!(
+                format!("{:?}", filter.hashers[i]),
+                format!("{:?}", de_filter.hashers[i])
+            );
+        }
     }
 }

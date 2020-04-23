@@ -335,7 +335,8 @@ mod tests {
         filter.insert("foo");
 
         let serialized_filter = bincode::serialize(&filter).unwrap();
-        let de_filter: PartitionedBloomFilter<String> = bincode::deserialize(&serialized_filter).unwrap();
+        let de_filter: PartitionedBloomFilter<String> =
+            bincode::deserialize(&serialized_filter).unwrap();
 
         assert!(de_filter.contains("foo"));
         assert_eq!(filter.bit_vec, de_filter.bit_vec);
