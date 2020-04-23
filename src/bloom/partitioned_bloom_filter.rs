@@ -1,5 +1,6 @@
 use crate::bit_vec::BitVec;
 use crate::util;
+use serde::{Deserialize, Serialize};
 use siphasher::sip::SipHasher;
 use std::borrow::Borrow;
 use std::hash::Hash;
@@ -30,6 +31,7 @@ use std::marker::PhantomData;
 /// assert_eq!(filter.bit_count(), 14);
 /// assert_eq!(filter.hasher_count(), 7);
 /// ```
+#[derive(Deserialize, Serialize)]
 pub struct PartitionedBloomFilter<T> {
     bit_vec: BitVec,
     hashers: [SipHasher; 2],
@@ -278,6 +280,7 @@ impl<T> PartitionedBloomFilter<T> {
 #[cfg(test)]
 mod tests {
     use super::PartitionedBloomFilter;
+    use bincode;
 
     #[test]
     fn test_from_item_count() {
@@ -324,5 +327,24 @@ mod tests {
 
         let expected_fpp = (7f64 / 959f64).powi(7);
         assert!((filter.estimated_fpp() - expected_fpp).abs() < 1e-15);
+    }
+
+    #[test]
+    fn test_ser_de() {
+        let mut filter = PartitionedBloomFilter::<String>::from_item_count(100, 0.01);
+        filter.insert("foo");
+
+        let serialized_filter = bincode::serialize(&filter).unwrap();
+        let de_filter: PartitionedBloomFilter<String> = bincode::deserialize(&serialized_filter).unwrap();
+
+        assert!(de_filter.contains("foo"));
+        assert_eq!(filter.bit_vec, de_filter.bit_vec);
+        assert_eq!(filter.bit_count, de_filter.bit_count);
+        // SipHasher doesn't implement PartialEq, but it does implement Debug,
+        // and its Debug impl does print all internal state.
+        assert_eq!(
+            format!("{:?}", filter.hashers),
+            format!("{:?}", de_filter.hashers)
+        );
     }
 }

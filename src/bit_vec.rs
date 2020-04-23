@@ -51,7 +51,7 @@ use std::slice;
 ///     vec![true, true, true, true, true],
 /// );
 /// ```
-#[derive(Deserialize, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, PartialEq, Serialize)]
 pub struct BitVec {
     blocks: Vec<u8>,
     len: usize,

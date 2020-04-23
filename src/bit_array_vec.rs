@@ -1,5 +1,6 @@
 //! Growable list of bit arrays.
 
+use serde::{Deserialize, Serialize};
 use std::cmp;
 use std::iter;
 use std::mem;
@@ -27,7 +28,7 @@ use std::ops::Range;
 ///     vec![vec![0], vec![1], vec![2], vec![3]],
 /// );
 /// ```
-#[derive(Clone)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct BitArrayVec {
     blocks: Vec<u8>,
     bit_count: usize,
