@@ -2,6 +2,7 @@ use crate::bit_array_vec::BitArrayVec;
 use crate::cuckoo::{DEFAULT_ENTRIES_PER_INDEX, DEFAULT_FINGERPRINT_BIT_COUNT, DEFAULT_MAX_KICKS};
 use crate::util;
 use rand::{Rng, XorShiftRng};
+use serde::{Deserialize, Serialize};
 use siphasher::sip::SipHasher;
 use std::borrow::Borrow;
 use std::cmp;
@@ -34,6 +35,7 @@ use std::marker::PhantomData;
 /// assert_eq!(filter.bucket_len(), 32);
 /// assert_eq!(filter.fingerprint_bit_count(), 8);
 /// ```
+#[derive(Deserialize, Serialize)]
 pub struct CuckooFilter<T> {
     max_kicks: usize,
     entries_per_index: usize,
@@ -586,6 +588,7 @@ impl<T> CuckooFilter<T> {
 #[cfg(test)]
 mod tests {
     use super::CuckooFilter;
+    use bincode;
 
     #[test]
     fn test_get_fingerprint() {
@@ -759,5 +762,26 @@ mod tests {
 
         let expected_fpp = 1.0 - ((2f64.powi(11) - 2.0) / (2f64.powi(11) - 1.0)).powf(8.0 / 128.0);
         assert!((filter.estimated_fpp() - expected_fpp).abs() < 1e-15);
+    }
+
+    #[test]
+    fn test_ser_de() {
+        let mut filter = CuckooFilter::<String>::from_entries_per_index(100, 0.01, 4);
+        filter.insert("foo");
+
+        let serialized_filter = bincode::serialize(&filter).unwrap();
+        let de_filter: CuckooFilter<String> = bincode::deserialize(&serialized_filter).unwrap();
+
+        assert!(de_filter.contains("foo"));
+        assert_eq!(filter.max_kicks, de_filter.max_kicks);
+        assert_eq!(filter.entries_per_index, de_filter.entries_per_index);
+        assert_eq!(filter.fingerprint_vec, de_filter.fingerprint_vec);
+        assert_eq!(filter.extra_items, de_filter.extra_items);
+        // SipHasher doesn't implement PartialEq, but it does implement Debug,
+        // and its Debug impl does print all internal state.
+        assert_eq!(
+            format!("{:?}", filter.hashers),
+            format!("{:?}", de_filter.hashers)
+        );
     }
 }
