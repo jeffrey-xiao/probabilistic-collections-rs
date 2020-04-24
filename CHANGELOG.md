@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.0 - 2020-04-24
+
+### Added
+
+- `serde` support under the `serde` feature.
+
+### Changed
+
+- Relax `count` in `count_min_sketch` to take `&self` instead of `&mut self`.
+
 ## 0.5.0 - 2018-11-03
 
 ### Added
