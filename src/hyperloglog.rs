@@ -2,7 +2,8 @@
 //! multiset.
 
 use rand::{Rng, XorShiftRng};
-use serde::{Deserialize, Serialize};
+#[cfg(feature = "serde")]
+use serde_crate::{Deserialize, Serialize};
 use siphasher::sip::SipHasher;
 use std::borrow::Borrow;
 use std::cmp;
@@ -35,7 +36,11 @@ use std::marker::PhantomData;
 ///
 /// assert!((hhl.len().round() - 3.0).abs() < EPSILON);
 /// ```
-#[derive(Deserialize, Serialize)]
+#[cfg_attr(
+    feature = "serde",
+    derive(Deserialize, Serialize),
+    serde(crate = "serde_crate")
+)]
 pub struct HyperLogLog<T> {
     alpha: f64,
     p: usize,
@@ -284,6 +289,7 @@ mod tests {
         assert!((hhl1.len().round() - 4.0).abs() < EPSILON);
     }
 
+    #[cfg(feature = "serde")]
     #[test]
     fn test_ser_de() {
         let mut hhl = HyperLogLog::<u32>::new(0.01);

@@ -2,7 +2,8 @@ use crate::bit_array_vec::BitArrayVec;
 use crate::cuckoo::{DEFAULT_ENTRIES_PER_INDEX, DEFAULT_FINGERPRINT_BIT_COUNT, DEFAULT_MAX_KICKS};
 use crate::util;
 use rand::{Rng, XorShiftRng};
-use serde::{Deserialize, Serialize};
+#[cfg(feature = "serde")]
+use serde_crate::{Deserialize, Serialize};
 use siphasher::sip::SipHasher;
 use std::borrow::Borrow;
 use std::cmp;
@@ -35,7 +36,12 @@ use std::marker::PhantomData;
 /// assert_eq!(filter.bucket_len(), 32);
 /// assert_eq!(filter.fingerprint_bit_count(), 8);
 /// ```
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug)]
+#[cfg_attr(
+    feature = "serde",
+    derive(Deserialize, Serialize),
+    serde(crate = "serde_crate")
+)]
 pub struct CuckooFilter<T> {
     max_kicks: usize,
     entries_per_index: usize,
@@ -599,7 +605,6 @@ impl<T> PartialEq for CuckooFilter<T> {
 #[cfg(test)]
 mod tests {
     use super::CuckooFilter;
-    use bincode;
 
     #[test]
     fn test_get_fingerprint() {
@@ -775,6 +780,7 @@ mod tests {
         assert!((filter.estimated_fpp() - expected_fpp).abs() < std::f64::EPSILON);
     }
 
+    #[cfg(feature = "serde")]
     #[test]
     fn test_ser_de() {
         let mut filter = CuckooFilter::<String>::from_entries_per_index(100, 0.01, 4);

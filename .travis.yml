@@ -32,10 +32,10 @@ before_script:
   - rustup component add rustfmt --toolchain stable
 
 script:
-  - cargo build --verbose --all-targets
+  - cargo build --verbose --all-targets --all-features
   - cargo +stable fmt --verbose --all -- --verbose --check
-  - cargo +stable clippy --verbose --all-targets
-  - cargo test --verbose
+  - cargo +stable clippy --verbose --all-targets --all-features
+  - cargo test --verbose --all-targets --all-features
 
 after_success:
   - |

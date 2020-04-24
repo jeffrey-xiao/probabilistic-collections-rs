@@ -1,6 +1,7 @@
 use crate::bit_vec::BitVec;
 use crate::util;
-use serde::{Deserialize, Serialize};
+#[cfg(feature = "serde")]
+use serde_crate::{Deserialize, Serialize};
 use siphasher::sip::SipHasher;
 use std::borrow::Borrow;
 use std::hash::Hash;
@@ -31,7 +32,11 @@ use std::marker::PhantomData;
 /// assert_eq!(filter.bit_count(), 14);
 /// assert_eq!(filter.hasher_count(), 7);
 /// ```
-#[derive(Deserialize, Serialize)]
+#[cfg_attr(
+    feature = "serde",
+    derive(Deserialize, Serialize),
+    serde(crate = "serde_crate")
+)]
 pub struct PartitionedBloomFilter<T> {
     bit_vec: BitVec,
     hashers: [SipHasher; 2],
@@ -280,7 +285,6 @@ impl<T> PartitionedBloomFilter<T> {
 #[cfg(test)]
 mod tests {
     use super::PartitionedBloomFilter;
-    use bincode;
 
     #[test]
     fn test_from_item_count() {
@@ -329,6 +333,7 @@ mod tests {
         assert!((filter.estimated_fpp() - expected_fpp).abs() < std::f64::EPSILON);
     }
 
+    #[cfg(feature = "serde")]
     #[test]
     fn test_ser_de() {
         let mut filter = PartitionedBloomFilter::<String>::from_item_count(100, 0.01);

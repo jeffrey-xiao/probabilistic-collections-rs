@@ -1,5 +1,6 @@
 use rand::{Rng, XorShiftRng};
-use serde::{Deserialize, Serialize};
+#[cfg(feature = "serde")]
+use serde_crate::{Deserialize, Serialize};
 use siphasher::sip::SipHasher;
 use std::cmp;
 use std::collections::HashSet;
@@ -33,7 +34,11 @@ use std::marker::PhantomData;
 ///     0b0111011001000001011110000011011010011011101001100101101000000001,
 /// );
 /// ```
-#[derive(Deserialize, Serialize)]
+#[cfg_attr(
+    feature = "serde",
+    derive(Deserialize, Serialize),
+    serde(crate = "serde_crate")
+)]
 pub struct SimHash<T, U> {
     hasher: SipHasher,
     _marker: PhantomData<(T, U)>,
@@ -208,6 +213,7 @@ mod tests {
         assert!(similarities.contains(&(1, 2)));
     }
 
+    #[cfg(feature = "serde")]
     #[test]
     fn test_ser_de() {
         let sim_hash = SimHash::new();

@@ -20,11 +20,17 @@ travis-ci = { repository = "jeffrey-xiao/probabilistic-collections-rs", branch =
 codecov = { repository = "jeffrey-xiao/probabilistic-collections-rs", service = "gitlab" }
 
 [dependencies]
-byteorder = "1"
 bincode = "1.0"
-siphasher = { version = "0.3.2", features = ["serde"] }
-serde = { version = "1.0", features = ["derive", "rc"] }
+byteorder = "1"
 rand = "0.4"
+siphasher = "0.3.2"
 
-[dev-dependencies]
-serde_test = "1.0"
+[dependencies.serde_crate]
+package = "serde"
+optional = true
+version = "1.0"
+default-features = false
+features = ["std", "derive"]
+
+[features]
+serde = ["siphasher/serde", "serde_crate"]

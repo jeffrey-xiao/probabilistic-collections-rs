@@ -1,6 +1,7 @@
 use crate::bit_vec::BitVec;
 use crate::util;
-use serde::{Deserialize, Serialize};
+#[cfg(feature = "serde")]
+use serde_crate::{Deserialize, Serialize};
 use siphasher::sip::SipHasher;
 use std::borrow::Borrow;
 use std::hash::Hash;
@@ -32,7 +33,12 @@ use std::marker::PhantomData;
 /// assert_eq!(filter.len(), 96);
 /// assert_eq!(filter.hasher_count(), 7);
 /// ```
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug)]
+#[cfg_attr(
+    feature = "serde",
+    derive(Deserialize, Serialize),
+    serde(crate = "serde_crate")
+)]
 pub struct BloomFilter<T> {
     bit_vec: BitVec,
     hashers: [SipHasher; 2],
@@ -347,6 +353,7 @@ mod tests {
         assert!((filter.estimated_fpp() - expected_fpp).abs() < std::f64::EPSILON);
     }
 
+    #[cfg(feature = "serde")]
     #[test]
     fn test_ser_de() {
         let mut filter = BloomFilter::<String>::new(100, 0.01);

@@ -1,5 +1,6 @@
 use crate::cuckoo::{CuckooFilter, DEFAULT_ENTRIES_PER_INDEX};
-use serde::{Deserialize, Serialize};
+#[cfg(feature = "serde")]
+use serde_crate::{Deserialize, Serialize};
 use std::borrow::Borrow;
 use std::hash::Hash;
 
@@ -37,7 +38,11 @@ use std::hash::Hash;
 /// assert_eq!(filter.capacity(), 128);
 /// assert_eq!(filter.filter_count(), 1);
 /// ```
-#[derive(Deserialize, Serialize)]
+#[cfg_attr(
+    feature = "serde",
+    derive(Deserialize, Serialize),
+    serde(crate = "serde_crate")
+)]
 pub struct ScalableCuckooFilter<T> {
     filters: Vec<CuckooFilter<T>>,
     initial_item_count: usize,
@@ -442,6 +447,7 @@ mod tests {
         assert!((scf.estimated_fpp() - expected_fpp).abs() < std::f64::EPSILON);
     }
 
+    #[cfg(feature = "serde")]
     #[test]
     fn test_ser_de() {
         let mut scf = ScalableCuckooFilter::<usize>::new(100, 0.01, 2.0, 0.5);

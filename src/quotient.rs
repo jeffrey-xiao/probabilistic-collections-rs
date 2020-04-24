@@ -1,7 +1,8 @@
 //! Space-efficient probabilistic data structure for approximate membership queries in a set.
 
 use rand::{Rng, XorShiftRng};
-use serde::{Deserialize, Serialize};
+#[cfg(feature = "serde")]
+use serde_crate::{Deserialize, Serialize};
 use siphasher::sip::SipHasher;
 use std::borrow::Borrow;
 use std::cmp::Ordering;
@@ -46,7 +47,11 @@ const METADATA_BITS: u8 = 3;
 /// assert_eq!(filter.quotient_bits(), 8);
 /// assert_eq!(filter.remainder_bits(), 4);
 /// ```
-#[derive(Deserialize, Serialize)]
+#[cfg_attr(
+    feature = "serde",
+    derive(Deserialize, Serialize),
+    serde(crate = "serde_crate")
+)]
 pub struct QuotientFilter<T> {
     quotient_bits: u8,
     remainder_bits: u8,
@@ -640,7 +645,6 @@ impl<T> fmt::Debug for QuotientFilter<T> {
 #[cfg(test)]
 mod tests {
     use super::QuotientFilter;
-    use bincode;
     use rand::{thread_rng, Rng};
 
     #[test]
@@ -720,6 +724,7 @@ mod tests {
         assert!(!filter.contains("barfoo"));
     }
 
+    #[cfg(feature = "serde")]
     #[test]
     fn test_ser_de() {
         let mut filter = QuotientFilter::<String>::new(8, 4);

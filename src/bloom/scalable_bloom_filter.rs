@@ -1,5 +1,6 @@
 use crate::bloom::BloomFilter;
-use serde::{Deserialize, Serialize};
+#[cfg(feature = "serde")]
+use serde_crate::{Deserialize, Serialize};
 use std::borrow::Borrow;
 use std::hash::Hash;
 
@@ -29,7 +30,11 @@ use std::hash::Hash;
 /// assert_eq!(filter.len(), 100);
 /// assert_eq!(filter.filter_count(), 1);
 /// ```
-#[derive(Deserialize, Serialize)]
+#[cfg_attr(
+    feature = "serde",
+    derive(Deserialize, Serialize),
+    serde(crate = "serde_crate")
+)]
 pub struct ScalableBloomFilter<T> {
     filters: Vec<BloomFilter<T>>,
     approximate_bits_used: usize,
@@ -315,6 +320,7 @@ mod tests {
         assert!((filter.estimated_fpp() - expected_fpp).abs() < std::f64::EPSILON);
     }
 
+    #[cfg(feature = "serde")]
     #[test]
     fn test_ser_de() {
         let mut filter = ScalableBloomFilter::<String>::new(100, 0.01, 2.0, 0.5);

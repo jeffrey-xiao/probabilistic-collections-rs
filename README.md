@@ -21,7 +21,14 @@ Add this to your `Cargo.toml`:
 probabilistic-collections = "*"
 ```
 
-and this to your crate root if you are using Rust 2015:
+For [`serde`](https://github.com/serde-rs/serde) support, include the `serde` feature:
+
+```toml
+[dependencies]
+probabilistic-collections = { version = "*", features = ["serde"] }
+```
+
+Add this to your crate root if you are using Rust 2015:
 
 ```rust
 extern crate probabilistic_collections;

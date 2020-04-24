@@ -1,6 +1,7 @@
 //! Growable list of bits.
 
-use serde::{Deserialize, Serialize};
+#[cfg(feature = "serde")]
+use serde_crate::{Deserialize, Serialize};
 use std::mem;
 use std::ops::{Index, Range};
 use std::slice;
@@ -51,7 +52,12 @@ use std::slice;
 ///     vec![true, true, true, true, true],
 /// );
 /// ```
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, PartialEq)]
+#[cfg_attr(
+    feature = "serde",
+    derive(Deserialize, Serialize),
+    serde(crate = "serde_crate")
+)]
 pub struct BitVec {
     blocks: Vec<u8>,
     len: usize,

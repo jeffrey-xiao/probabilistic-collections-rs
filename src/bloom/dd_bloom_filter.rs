@@ -1,7 +1,8 @@
 use crate::bit_vec::BitVec;
 use crate::util;
 use rand::{Rng, XorShiftRng};
-use serde::{Deserialize, Serialize};
+#[cfg(feature = "serde")]
+use serde_crate::{Deserialize, Serialize};
 use siphasher::sip::SipHasher;
 use std::borrow::Borrow;
 use std::f64::consts;
@@ -34,11 +35,15 @@ const PRIME: u64 = 0xFFFF_FFFF_FFFF_FFC5;
 /// assert_eq!(filter.bit_count(), 10);
 /// assert_eq!(filter.hasher_count(), 7);
 /// ```
-#[derive(Deserialize, Serialize)]
+#[cfg_attr(
+    feature = "serde",
+    derive(Deserialize, Serialize),
+    serde(crate = "serde_crate")
+)]
 pub struct BSBloomFilter<T> {
     bit_vec: BitVec,
     hashers: [SipHasher; 2],
-    #[serde(skip, default = "XorShiftRng::new_unseeded")]
+    #[cfg_attr(feature = "serde", serde(skip, default = "XorShiftRng::new_unseeded"))]
     rng: XorShiftRng,
     bit_count: usize,
     hasher_count: usize,
@@ -279,11 +284,15 @@ impl<T> BSBloomFilter<T> {
 /// assert_eq!(filter.bit_count(), 10);
 /// assert_eq!(filter.hasher_count(), 7);
 /// ```
-#[derive(Deserialize, Serialize)]
+#[cfg_attr(
+    feature = "serde",
+    derive(Deserialize, Serialize),
+    serde(crate = "serde_crate")
+)]
 pub struct BSSDBloomFilter<T> {
     bit_vec: BitVec,
     hashers: [SipHasher; 2],
-    #[serde(skip, default = "XorShiftRng::new_unseeded")]
+    #[cfg_attr(feature = "serde", serde(skip, default = "XorShiftRng::new_unseeded"))]
     rng: XorShiftRng,
     bit_count: usize,
     hasher_count: usize,
@@ -520,11 +529,15 @@ impl<T> BSSDBloomFilter<T> {
 /// assert_eq!(filter.bit_count(), 10);
 /// assert_eq!(filter.hasher_count(), 7);
 /// ```
-#[derive(Deserialize, Serialize)]
+#[cfg_attr(
+    feature = "serde",
+    derive(Deserialize, Serialize),
+    serde(crate = "serde_crate")
+)]
 pub struct RLBSBloomFilter<T> {
     bit_vecs: Vec<BitVec>,
     hashers: [SipHasher; 2],
-    #[serde(skip, default = "XorShiftRng::new_unseeded")]
+    #[cfg_attr(feature = "serde", serde(skip, default = "XorShiftRng::new_unseeded"))]
     rng: XorShiftRng,
     bit_count: usize,
     hasher_count: usize,
@@ -770,6 +783,7 @@ mod tests {
         assert_eq!(filter.hasher_count(), 7);
     }
 
+    #[cfg(feature = "serde")]
     #[test]
     fn test_bs_ser_de() {
         let mut filter = BSBloomFilter::<String>::new(10, 0.01);
@@ -810,6 +824,7 @@ mod tests {
         assert_eq!(filter.hasher_count(), 7);
     }
 
+    #[cfg(feature = "serde")]
     #[test]
     fn test_bssd_ser_de() {
         let mut filter = BSSDBloomFilter::<String>::new(10, 0.01);
@@ -850,6 +865,7 @@ mod tests {
         assert_eq!(filter.hasher_count(), 7);
     }
 
+    #[cfg(feature = "serde")]
     #[test]
     fn test_rlbs_ser_de() {
         let mut filter = BSSDBloomFilter::<String>::new(10, 0.01);

@@ -1,7 +1,8 @@
 //! Space-efficient probabilistic data structure for estimating the number of item occurrences.
 
 use crate::util;
-use serde::{Deserialize, Serialize};
+#[cfg(feature = "serde")]
+use serde_crate::{Deserialize, Serialize};
 use siphasher::sip::SipHasher;
 use std::borrow::Borrow;
 use std::hash::Hash;
@@ -87,7 +88,11 @@ impl CountStrategy for CountMedianBiasStrategy {
 /// assert!(count_min_sketch.confidence() <= 0.1);
 /// assert!(count_min_sketch.error() <= 0.05);
 /// ```
-#[derive(Deserialize, Serialize)]
+#[cfg_attr(
+    feature = "serde",
+    derive(Deserialize, Serialize),
+    serde(crate = "serde_crate")
+)]
 pub struct CountMinSketch<T, U> {
     // A 2D grid represented as a 1D vector of signed 64-bit integers to support removals and
     // negatives.
@@ -376,6 +381,7 @@ mod tests {
                         assert_eq!(cms.count("foo"), 0);
                     }
 
+                    #[cfg(feature = "serde")]
                     #[test]
                     fn test_ser_de() {
                         let mut cms = CountMinSketch::<$strategy, String>::from_error(0.1, 0.05);

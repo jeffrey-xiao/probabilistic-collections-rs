@@ -1,6 +1,7 @@
 //! Growable list of bit arrays.
 
-use serde::{Deserialize, Serialize};
+#[cfg(feature = "serde")]
+use serde_crate::{Deserialize, Serialize};
 use std::cmp;
 use std::iter;
 use std::mem;
@@ -28,7 +29,12 @@ use std::ops::Range;
 ///     vec![vec![0], vec![1], vec![2], vec![3]],
 /// );
 /// ```
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, PartialEq)]
+#[cfg_attr(
+    feature = "serde",
+    derive(Deserialize, Serialize),
+    serde(crate = "serde_crate")
+)]
 pub struct BitArrayVec {
     blocks: Vec<u8>,
     bit_count: usize,
