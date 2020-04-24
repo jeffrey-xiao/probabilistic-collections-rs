@@ -28,7 +28,7 @@ use std::ops::Range;
 ///     vec![vec![0], vec![1], vec![2], vec![3]],
 /// );
 /// ```
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, PartialEq, Serialize)]
 pub struct BitArrayVec {
     blocks: Vec<u8>,
     bit_count: usize,

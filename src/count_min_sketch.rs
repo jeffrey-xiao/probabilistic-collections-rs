@@ -1,6 +1,7 @@
 //! Space-efficient probabilistic data structure for estimating the number of item occurrences.
 
 use crate::util;
+use serde::{Deserialize, Serialize};
 use siphasher::sip::SipHasher;
 use std::borrow::Borrow;
 use std::hash::Hash;
@@ -86,6 +87,7 @@ impl CountStrategy for CountMedianBiasStrategy {
 /// assert!(count_min_sketch.confidence() <= 0.1);
 /// assert!(count_min_sketch.error() <= 0.05);
 /// ```
+#[derive(Deserialize, Serialize)]
 pub struct CountMinSketch<T, U> {
     // A 2D grid represented as a 1D vector of signed 64-bit integers to support removals and
     // negatives
@@ -372,6 +374,29 @@ mod tests {
                         cms.add("foo", 3);
                         cms.clear();
                         assert_eq!(cms.count("foo"), 0);
+                    }
+
+                    #[test]
+                    fn test_ser_de() {
+                        let mut cms = CountMinSketch::<$strategy, String>::from_error(0.1, 0.05);
+                        cms.add("foo", 3);
+
+                        let serialized_cms = bincode::serialize(&cms).unwrap();
+                        let de_cms: CountMinSketch<$strategy, String> = bincode::deserialize(&serialized_cms).unwrap();
+
+                        assert_eq!(cms.count("foo"), de_cms.count("foo"));
+                        assert_eq!(cms.rows, de_cms.rows);
+                        assert_eq!(cms.cols, de_cms.cols);
+                        assert_eq!(cms.items, de_cms.items);
+                        assert_eq!(cms.grid, de_cms.grid);
+                        // SipHasher doesn't implement PartialEq, but it does implement Debug,
+                        // and its Debug impl does print all internal state.
+                        for i in 0..2 {
+                            assert_eq!(
+                                format!("{:?}", cms.hashers[i]),
+                                format!("{:?}", de_cms.hashers[i])
+                            );
+                        }
                     }
                 }
             )*

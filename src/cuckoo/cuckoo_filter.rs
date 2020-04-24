@@ -35,7 +35,7 @@ use std::marker::PhantomData;
 /// assert_eq!(filter.bucket_len(), 32);
 /// assert_eq!(filter.fingerprint_bit_count(), 8);
 /// ```
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct CuckooFilter<T> {
     max_kicks: usize,
     entries_per_index: usize,
@@ -582,6 +582,17 @@ impl<T> CuckooFilter<T> {
         let occupied_len = self.fingerprint_vec.occupied_len();
         let occupied_ratio = occupied_len as f64 / self.capacity() as f64;
         1.0 - single_fpp.powf(2.0 * self.entries_per_index() as f64 * occupied_ratio)
+    }
+}
+
+impl<T> PartialEq for CuckooFilter<T> {
+    fn eq(&self, other: &CuckooFilter<T>) -> bool {
+        self.max_kicks == other.max_kicks
+            && self.entries_per_index == other.entries_per_index
+            && self.fingerprint_vec == other.fingerprint_vec
+            && self.extra_items == other.extra_items
+            && self.hashers[0].keys() == other.hashers[0].keys()
+            && self.hashers[1].keys() == other.hashers[1].keys()
     }
 }
 

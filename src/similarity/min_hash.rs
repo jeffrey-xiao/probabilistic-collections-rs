@@ -1,4 +1,5 @@
 use crate::util;
+use serde::{Deserialize, Serialize};
 use siphasher::sip::SipHasher;
 use std::hash::Hash;
 use std::marker::PhantomData;
@@ -24,6 +25,7 @@ use std::marker::PhantomData;
 ///     0.42,
 /// );
 /// ```
+#[derive(Deserialize, Serialize)]
 pub struct MinHash<T, U> {
     hashers: [SipHasher; 2],
     hasher_count: usize,
@@ -198,5 +200,24 @@ mod tests {
         assert!(f64::abs(similarity - 0.00) < f64::EPSILON);
 
         assert_eq!(min_hash.hasher_count(), 100);
+    }
+
+    #[test]
+    fn test_ser_de() {
+        let min_hash = MinHash::new(100);
+        let serialized_min_hash = bincode::serialize(&min_hash).unwrap();
+        let de_min_hash: MinHash<ShingleIterator<str>, Vec<&str>> =
+            bincode::deserialize(&serialized_min_hash).unwrap();
+
+        assert_eq!(
+            min_hash.get_similarity(
+                ShingleIterator::new(2, S1.split(' ').collect()),
+                ShingleIterator::new(2, S2.split(' ').collect()),
+            ),
+            de_min_hash.get_similarity(
+                ShingleIterator::new(2, S1.split(' ').collect()),
+                ShingleIterator::new(2, S2.split(' ').collect()),
+            )
+        );
     }
 }

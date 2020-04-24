@@ -1,4 +1,5 @@
 use crate::cuckoo::{CuckooFilter, DEFAULT_ENTRIES_PER_INDEX};
+use serde::{Deserialize, Serialize};
 use std::borrow::Borrow;
 use std::hash::Hash;
 
@@ -36,6 +37,7 @@ use std::hash::Hash;
 /// assert_eq!(filter.capacity(), 128);
 /// assert_eq!(filter.filter_count(), 1);
 /// ```
+#[derive(Deserialize, Serialize)]
 pub struct ScalableCuckooFilter<T> {
     filters: Vec<CuckooFilter<T>>,
     initial_item_count: usize,
@@ -438,5 +440,21 @@ mod tests {
         let filter_fpp_1 = scf.filters[1].estimated_fpp();
         let expected_fpp = 1.0 - (1.0 - filter_fpp_0) * (1.0 - filter_fpp_1);
         assert!((scf.estimated_fpp() - expected_fpp).abs() < std::f64::EPSILON);
+    }
+
+    #[test]
+    fn test_ser_de() {
+        let mut scf = ScalableCuckooFilter::<usize>::new(100, 0.01, 2.0, 0.5);
+        scf.insert(&0);
+
+        let serialized_scf = bincode::serialize(&scf).unwrap();
+        let de_scf: ScalableCuckooFilter<usize> = bincode::deserialize(&serialized_scf).unwrap();
+
+        assert!(scf.contains(&0));
+        assert_eq!(scf.filters, de_scf.filters);
+        assert_eq!(scf.initial_item_count, de_scf.initial_item_count);
+        assert!((scf.initial_fpp - de_scf.initial_fpp).abs() < std::f64::EPSILON);
+        assert!((scf.growth_ratio - de_scf.growth_ratio).abs() < std::f64::EPSILON);
+        assert!((scf.tightening_ratio - de_scf.tightening_ratio).abs() < std::f64::EPSILON);
     }
 }

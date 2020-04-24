@@ -1,4 +1,5 @@
 use crate::bloom::BloomFilter;
+use serde::{Deserialize, Serialize};
 use std::borrow::Borrow;
 use std::hash::Hash;
 
@@ -28,6 +29,7 @@ use std::hash::Hash;
 /// assert_eq!(filter.len(), 100);
 /// assert_eq!(filter.filter_count(), 1);
 /// ```
+#[derive(Deserialize, Serialize)]
 pub struct ScalableBloomFilter<T> {
     filters: Vec<BloomFilter<T>>,
     approximate_bits_used: usize,
@@ -311,5 +313,25 @@ mod tests {
         let fpp_1 = 1.0 - filter.filters[1].estimated_fpp();
         let expected_fpp = 1.0 - (fpp_0 * fpp_1);
         assert!((filter.estimated_fpp() - expected_fpp).abs() < std::f64::EPSILON);
+    }
+
+    #[test]
+    fn test_ser_de() {
+        let mut filter = ScalableBloomFilter::<String>::new(100, 0.01, 2.0, 0.5);
+        filter.insert("foo");
+
+        let serialized_filter = bincode::serialize(&filter).unwrap();
+        let de_filter: ScalableBloomFilter<String> =
+            bincode::deserialize(&serialized_filter).unwrap();
+
+        assert!(de_filter.contains("foo"));
+        assert_eq!(filter.filters, de_filter.filters);
+        assert_eq!(
+            filter.approximate_bits_used,
+            de_filter.approximate_bits_used
+        );
+        assert!((filter.initial_fpp - de_filter.initial_fpp).abs() < std::f64::EPSILON);
+        assert!((filter.growth_ratio - de_filter.growth_ratio).abs() < std::f64::EPSILON);
+        assert!((filter.tightening_ratio - de_filter.tightening_ratio).abs() < std::f64::EPSILON);
     }
 }

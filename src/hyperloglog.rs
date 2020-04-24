@@ -2,6 +2,7 @@
 //! multiset.
 
 use rand::{Rng, XorShiftRng};
+use serde::{Deserialize, Serialize};
 use siphasher::sip::SipHasher;
 use std::borrow::Borrow;
 use std::cmp;
@@ -34,6 +35,7 @@ use std::marker::PhantomData;
 ///
 /// assert!((hhl.len().round() - 3.0).abs() < EPSILON);
 /// ```
+#[derive(Deserialize, Serialize)]
 pub struct HyperLogLog<T> {
     alpha: f64,
     p: usize,
@@ -280,5 +282,24 @@ mod tests {
 
         hhl1.merge(&hhl2);
         assert!((hhl1.len().round() - 4.0).abs() < EPSILON);
+    }
+
+    #[test]
+    fn test_ser_de() {
+        let mut hhl = HyperLogLog::<u32>::new(0.01);
+        for key in &[0, 1, 2, 0, 1, 2] {
+            hhl.insert(&key);
+        }
+
+        let serialized_hhl = bincode::serialize(&hhl).unwrap();
+        let de_hhl: HyperLogLog<u32> = bincode::deserialize(&serialized_hhl).unwrap();
+
+        assert!((hhl.len() - de_hhl.len()).abs() < EPSILON);
+        assert!((hhl.alpha - de_hhl.alpha).abs() < EPSILON);
+        assert_eq!(hhl.p, de_hhl.p);
+        assert_eq!(hhl.registers, de_hhl.registers);
+        // SipHasher doesn't implement PartialEq, but it does implement Debug,
+        // and its Debug impl does print all internal state.
+        assert_eq!(format!("{:?}", hhl.hasher), format!("{:?}", de_hhl.hasher));
     }
 }

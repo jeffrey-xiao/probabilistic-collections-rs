@@ -32,7 +32,7 @@ use std::marker::PhantomData;
 /// assert_eq!(filter.len(), 96);
 /// assert_eq!(filter.hasher_count(), 7);
 /// ```
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct BloomFilter<T> {
     bit_vec: BitVec,
     hashers: [SipHasher; 2],

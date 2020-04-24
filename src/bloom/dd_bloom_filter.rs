@@ -1,6 +1,7 @@
 use crate::bit_vec::BitVec;
 use crate::util;
 use rand::{Rng, XorShiftRng};
+use serde::{Deserialize, Serialize};
 use siphasher::sip::SipHasher;
 use std::borrow::Borrow;
 use std::f64::consts;
@@ -33,9 +34,11 @@ const PRIME: u64 = 0xFFFF_FFFF_FFFF_FFC5;
 /// assert_eq!(filter.bit_count(), 10);
 /// assert_eq!(filter.hasher_count(), 7);
 /// ```
+#[derive(Deserialize, Serialize)]
 pub struct BSBloomFilter<T> {
     bit_vec: BitVec,
     hashers: [SipHasher; 2],
+    #[serde(skip, default = "XorShiftRng::new_unseeded")]
     rng: XorShiftRng,
     bit_count: usize,
     hasher_count: usize,
@@ -276,9 +279,11 @@ impl<T> BSBloomFilter<T> {
 /// assert_eq!(filter.bit_count(), 10);
 /// assert_eq!(filter.hasher_count(), 7);
 /// ```
+#[derive(Deserialize, Serialize)]
 pub struct BSSDBloomFilter<T> {
     bit_vec: BitVec,
     hashers: [SipHasher; 2],
+    #[serde(skip, default = "XorShiftRng::new_unseeded")]
     rng: XorShiftRng,
     bit_count: usize,
     hasher_count: usize,
@@ -515,9 +520,11 @@ impl<T> BSSDBloomFilter<T> {
 /// assert_eq!(filter.bit_count(), 10);
 /// assert_eq!(filter.hasher_count(), 7);
 /// ```
+#[derive(Deserialize, Serialize)]
 pub struct RLBSBloomFilter<T> {
     bit_vecs: Vec<BitVec>,
     hashers: [SipHasher; 2],
+    #[serde(skip, default = "XorShiftRng::new_unseeded")]
     rng: XorShiftRng,
     bit_count: usize,
     hasher_count: usize,
@@ -764,6 +771,28 @@ mod tests {
     }
 
     #[test]
+    fn test_bs_ser_de() {
+        let mut filter = BSBloomFilter::<String>::new(10, 0.01);
+        filter.insert("foo");
+
+        let serialized_filter = bincode::serialize(&filter).unwrap();
+        let de_filter: BSBloomFilter<String> = bincode::deserialize(&serialized_filter).unwrap();
+
+        assert!(de_filter.contains("foo"));
+        assert_eq!(filter.bit_vec, de_filter.bit_vec);
+        assert_eq!(filter.bit_count, de_filter.bit_count);
+        assert_eq!(filter.hasher_count, de_filter.hasher_count);
+        // SipHasher doesn't implement PartialEq, but it does implement Debug,
+        // and its Debug impl does print all internal state.
+        for i in 0..2 {
+            assert_eq!(
+                format!("{:?}", filter.hashers[i]),
+                format!("{:?}", de_filter.hashers[i])
+            );
+        }
+    }
+
+    #[test]
     fn test_bssd() {
         let mut filter = BSSDBloomFilter::<String>::new(10, 0.01);
 
@@ -782,6 +811,28 @@ mod tests {
     }
 
     #[test]
+    fn test_bssd_ser_de() {
+        let mut filter = BSSDBloomFilter::<String>::new(10, 0.01);
+        filter.insert("foo");
+
+        let serialized_filter = bincode::serialize(&filter).unwrap();
+        let de_filter: BSBloomFilter<String> = bincode::deserialize(&serialized_filter).unwrap();
+
+        assert!(de_filter.contains("foo"));
+        assert_eq!(filter.bit_vec, de_filter.bit_vec);
+        assert_eq!(filter.bit_count, de_filter.bit_count);
+        assert_eq!(filter.hasher_count, de_filter.hasher_count);
+        // SipHasher doesn't implement PartialEq, but it does implement Debug,
+        // and its Debug impl does print all internal state.
+        for i in 0..2 {
+            assert_eq!(
+                format!("{:?}", filter.hashers[i]),
+                format!("{:?}", de_filter.hashers[i])
+            );
+        }
+    }
+
+    #[test]
     fn test_rlbs() {
         let mut filter = RLBSBloomFilter::<String>::new(10, 0.01);
 
@@ -797,5 +848,27 @@ mod tests {
         assert_eq!(filter.len(), 70);
         assert_eq!(filter.bit_count(), 10);
         assert_eq!(filter.hasher_count(), 7);
+    }
+
+    #[test]
+    fn test_rlbs_ser_de() {
+        let mut filter = BSSDBloomFilter::<String>::new(10, 0.01);
+        filter.insert("foo");
+
+        let serialized_filter = bincode::serialize(&filter).unwrap();
+        let de_filter: BSBloomFilter<String> = bincode::deserialize(&serialized_filter).unwrap();
+
+        assert!(de_filter.contains("foo"));
+        assert_eq!(filter.bit_vec, de_filter.bit_vec);
+        assert_eq!(filter.bit_count, de_filter.bit_count);
+        assert_eq!(filter.hasher_count, de_filter.hasher_count);
+        // SipHasher doesn't implement PartialEq, but it does implement Debug,
+        // and its Debug impl does print all internal state.
+        for i in 0..2 {
+            assert_eq!(
+                format!("{:?}", filter.hashers[i]),
+                format!("{:?}", de_filter.hashers[i])
+            );
+        }
     }
 }
