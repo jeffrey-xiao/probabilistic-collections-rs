@@ -90,7 +90,7 @@ impl CountStrategy for CountMedianBiasStrategy {
 #[derive(Deserialize, Serialize)]
 pub struct CountMinSketch<T, U> {
     // A 2D grid represented as a 1D vector of signed 64-bit integers to support removals and
-    // negatives
+    // negatives.
     rows: usize,
     cols: usize,
     items: i64,
@@ -206,7 +206,7 @@ impl<T, U> CountMinSketch<T, U> {
     /// count_min_sketch.add("foo", 3);
     /// assert_eq!(count_min_sketch.count("foo"), 3);
     /// ```
-    pub fn count<V>(&mut self, item: &V) -> i64
+    pub fn count<V>(&self, item: &V) -> i64
     where
         T: CountStrategy,
         U: Borrow<V>,
