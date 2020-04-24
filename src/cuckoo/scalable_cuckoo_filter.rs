@@ -331,10 +331,10 @@ impl<T> ScalableCuckooFilter<T> {
     /// use probabilistic_collections::cuckoo::ScalableCuckooFilter;
     ///
     /// let mut filter = ScalableCuckooFilter::<String>::new(100, 0.01, 2.0, 0.5);
-    /// assert!(filter.estimated_fpp() < 1e-15);
+    /// assert!(filter.estimated_fpp() < std::f64::EPSILON);
     ///
     /// filter.insert("foo");
-    /// assert!(filter.estimated_fpp() > 1e-15);
+    /// assert!(filter.estimated_fpp() > std::f64::EPSILON);
     /// assert!(filter.estimated_fpp() < 0.01);
     pub fn estimated_fpp(&self) -> f64 {
         1.0 - self
@@ -428,7 +428,7 @@ mod tests {
     #[test]
     fn test_estimated_fpp() {
         let mut scf = ScalableCuckooFilter::<u32>::new(100, 0.01, 2.0, 0.5);
-        assert!(scf.estimated_fpp() < 1e-15);
+        assert!(scf.estimated_fpp() < std::f64::EPSILON);
 
         for item in 0..200 {
             scf.insert(&item);
@@ -437,6 +437,6 @@ mod tests {
         let filter_fpp_0 = scf.filters[0].estimated_fpp();
         let filter_fpp_1 = scf.filters[1].estimated_fpp();
         let expected_fpp = 1.0 - (1.0 - filter_fpp_0) * (1.0 - filter_fpp_1);
-        assert!((scf.estimated_fpp() - expected_fpp).abs() < 1e-15);
+        assert!((scf.estimated_fpp() - expected_fpp).abs() < std::f64::EPSILON);
     }
 }

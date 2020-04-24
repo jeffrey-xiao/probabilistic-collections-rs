@@ -265,10 +265,10 @@ impl<T> PartitionedBloomFilter<T> {
     /// use probabilistic_collections::bloom::PartitionedBloomFilter;
     ///
     /// let mut filter = PartitionedBloomFilter::<String>::from_item_count(100, 0.01);
-    /// assert!(filter.estimated_fpp() < 1e-15);
+    /// assert!(filter.estimated_fpp() < std::f64::EPSILON);
     ///
     /// filter.insert("foo");
-    /// assert!(filter.estimated_fpp() > 1e-15);
+    /// assert!(filter.estimated_fpp() > std::f64::EPSILON);
     /// assert!(filter.estimated_fpp() < 0.01);
     /// ```
     pub fn estimated_fpp(&self) -> f64 {
@@ -321,12 +321,12 @@ mod tests {
     #[test]
     fn test_estimated_fpp() {
         let mut filter = PartitionedBloomFilter::<String>::from_item_count(100, 0.01);
-        assert!(filter.estimated_fpp() < 1e-15);
+        assert!(filter.estimated_fpp() < std::f64::EPSILON);
 
         filter.insert("foo");
 
         let expected_fpp = (7f64 / 959f64).powi(7);
-        assert!((filter.estimated_fpp() - expected_fpp).abs() < 1e-15);
+        assert!((filter.estimated_fpp() - expected_fpp).abs() < std::f64::EPSILON);
     }
 
     #[test]

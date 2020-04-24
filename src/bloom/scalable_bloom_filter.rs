@@ -246,10 +246,10 @@ impl<T> ScalableBloomFilter<T> {
     /// use probabilistic_collections::bloom::ScalableBloomFilter;
     ///
     /// let mut filter = ScalableBloomFilter::<String>::new(100, 0.01, 2.0, 0.5);
-    /// assert!(filter.estimated_fpp() < 1e-15);
+    /// assert!(filter.estimated_fpp() < std::f64::EPSILON);
     ///
     /// filter.insert("foo");
-    /// assert!(filter.estimated_fpp() > 1e-15);
+    /// assert!(filter.estimated_fpp() > std::f64::EPSILON);
     /// assert!(filter.estimated_fpp() < 0.01);
     /// ```
     pub fn estimated_fpp(&self) -> f64 {
@@ -301,7 +301,7 @@ mod tests {
     #[test]
     fn test_estimated_fpp() {
         let mut filter = ScalableBloomFilter::<u32>::new(700, 0.01, 2.0, 0.5);
-        assert!(filter.estimated_fpp() < 1e-15);
+        assert!(filter.estimated_fpp() < std::f64::EPSILON);
 
         for item in 0..200 {
             filter.insert(&item);
@@ -310,6 +310,6 @@ mod tests {
         let fpp_0 = 1.0 - filter.filters[0].estimated_fpp();
         let fpp_1 = 1.0 - filter.filters[1].estimated_fpp();
         let expected_fpp = 1.0 - (fpp_0 * fpp_1);
-        assert!((filter.estimated_fpp() - expected_fpp).abs() < 1e-15);
+        assert!((filter.estimated_fpp() - expected_fpp).abs() < std::f64::EPSILON);
     }
 }

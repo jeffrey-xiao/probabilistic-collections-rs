@@ -614,10 +614,10 @@ impl<T> QuotientFilter<T> {
     /// use probabilistic_collections::quotient::QuotientFilter;
     ///
     /// let mut filter = QuotientFilter::<String>::from_fpp(100, 0.05);
-    /// assert!(filter.estimated_fpp() < 1e-15);
+    /// assert!(filter.estimated_fpp() < std::f64::EPSILON);
     ///
     /// filter.insert("foo");
-    /// assert!(filter.estimated_fpp() > 1e-15);
+    /// assert!(filter.estimated_fpp() > std::f64::EPSILON);
     /// assert!(filter.estimated_fpp() < 0.05);
     /// ```
     pub fn estimated_fpp(&self) -> f64 {
