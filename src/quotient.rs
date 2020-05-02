@@ -282,7 +282,6 @@ impl<T> QuotientFilter<T> {
         T: Borrow<U>,
         U: Hash + ?Sized,
     {
-        assert!(self.len() < self.capacity());
         let (quotient, remainder) = self.get_quotient_and_remainder(self.get_hash(item));
         let slot = self.get_slot(quotient);
 
@@ -297,6 +296,7 @@ impl<T> QuotientFilter<T> {
         if self.contains(item) {
             return;
         }
+        assert!(self.len() < self.capacity());
 
         // canonical slot not occupied, so insertion will generate a new run
         // we set occupied mask first so `get_run_start` will get the correct position to insert
@@ -755,6 +755,7 @@ mod tests {
         let mut rng: rand::XorShiftRng = rand::SeedableRng::from_seed([1, 1, 1, 1]);
         let quotient_bits = 16;
         let remainder_bits = 48;
+        let n = 18;
 
         // large remainder to not get false positives
         let mut filter = QuotientFilter::<u64>::new(quotient_bits, remainder_bits);
@@ -764,16 +765,17 @@ mod tests {
 
         let mut items = Vec::new();
         for _ in 0..1 << quotient_bits {
-            let item = rng.gen_range::<u64>(1 << 32, 1 << 63) as u64;
-            if !filter.contains(&item) {
-                filter.insert(&item);
-                filter.insert(&item);
-                items.push(item);
+            let mut item = rng.gen_range::<u64>(1 << n, 1 << 63) as u64;
+            while filter.contains(&item) {
+                item = rng.gen_range::<u64>(1 << n, 1 << 63) as u64;
             }
+            filter.insert(&item);
+            filter.insert(&item);
+            items.push(item);
         }
 
         for _ in 0..100 {
-            let item = rng.gen_range::<u64>(0, 1 << 32);
+            let item = rng.gen_range::<u64>(0, 1 << n);
             assert!(!filter.contains(&item));
             filter.remove(&item);
         }
