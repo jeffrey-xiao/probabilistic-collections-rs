@@ -374,10 +374,15 @@ mod tests {
             assert!(!scf.contains(&item));
         }
 
+        let mut expected_len = 0;
         for item in 0..130 {
+            if scf.contains(&item) {
+                continue;
+            }
             scf.insert(&item);
+            expected_len += 1;
             assert!(scf.contains(&item));
-            assert_eq!(scf.len(), item + 1);
+            assert_eq!(scf.len(), expected_len);
         }
 
         assert_eq!(scf.capacity(), 384);
@@ -388,9 +393,13 @@ mod tests {
         assert_eq!(scf.filters[1].fingerprint_bit_count(), 12);
 
         for item in 0..130 {
+            if !scf.contains(&item) {
+                continue;
+            }
             scf.remove(&item);
+            expected_len -= 1;
             assert!(!scf.contains(&item));
-            assert_eq!(scf.len(), 130 - item - 1);
+            assert_eq!(scf.len(), expected_len);
         }
     }
 
