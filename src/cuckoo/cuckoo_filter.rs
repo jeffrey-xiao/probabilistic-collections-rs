@@ -48,6 +48,8 @@ pub struct CuckooFilter<T> {
     fingerprint_vec: BitArrayVec,
     pub(super) extra_items: Vec<(u64, usize)>,
     hashers: [SipHasher; 2],
+    #[cfg_attr(feature = "serde", serde(skip, default = "XorShiftRng::new_unseeded"))]
+    rng: XorShiftRng,
     _marker: PhantomData<T>,
 }
 
@@ -83,6 +85,7 @@ impl<T> CuckooFilter<T> {
             ),
             extra_items: Vec::new(),
             hashers: util::get_hashers(),
+            rng: XorShiftRng::new_unseeded(),
             _marker: PhantomData,
         }
     }
@@ -128,6 +131,7 @@ impl<T> CuckooFilter<T> {
             ),
             extra_items: Vec::new(),
             hashers: util::get_hashers(),
+            rng: XorShiftRng::new_unseeded(),
             _marker: PhantomData,
         }
     }
@@ -165,6 +169,7 @@ impl<T> CuckooFilter<T> {
             ),
             extra_items: Vec::new(),
             hashers: util::get_hashers(),
+            rng: XorShiftRng::new_unseeded(),
             _marker: PhantomData,
         }
     }
@@ -210,6 +215,7 @@ impl<T> CuckooFilter<T> {
             ),
             extra_items: Vec::new(),
             hashers: util::get_hashers(),
+            rng: XorShiftRng::new_unseeded(),
             _marker: PhantomData,
         }
     }
@@ -279,12 +285,11 @@ impl<T> CuckooFilter<T> {
             }
 
             // have to kick out an entry
-            let mut rng = XorShiftRng::new_unseeded();
-            let mut index = if rng.gen::<bool>() { index_1 } else { index_2 };
+            let mut index = if self.rng.gen::<bool>() { index_1 } else { index_2 };
             let mut prev_index = index;
 
             for _ in 0..self.max_kicks {
-                let bucket_index = rng.gen_range(0, self.entries_per_index);
+                let bucket_index = self.rng.gen_range(0, self.entries_per_index);
                 let vec_index = self.get_vec_index(index, bucket_index);
                 let new_fingerprint = self.fingerprint_vec.get(vec_index);
                 self.fingerprint_vec.set(vec_index, fingerprint.as_slice());
