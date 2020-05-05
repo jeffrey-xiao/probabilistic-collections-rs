@@ -101,13 +101,13 @@ where
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::{get_jaccard_similarity, ShingleIterator};
     use std::f64;
 
-    static S1: &str = "the cat sat on a mat";
-    static S2: &str = "the cat sat on the mat";
-    static S3: &str = "we all scream for ice cream";
+    pub const S1: &str = "the cat sat on a mat";
+    pub const S2: &str = "the cat sat on the mat";
+    pub const S3: &str = "we all scream for ice cream";
 
     #[test]
     fn test_jaccard_similarity() {

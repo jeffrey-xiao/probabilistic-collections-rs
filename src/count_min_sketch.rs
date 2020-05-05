@@ -1,10 +1,10 @@
 //! Space-efficient probabilistic data structure for estimating the number of item occurrences.
 
-use crate::util;
+use crate::{DoubleHasher, HashIter, SipHasherBuilder};
 #[cfg(feature = "serde")]
 use serde_crate::{Deserialize, Serialize};
-use siphasher::sip::SipHasher;
 use std::borrow::Borrow;
+use std::hash::BuildHasher;
 use std::hash::Hash;
 use std::marker::PhantomData;
 
@@ -93,14 +93,14 @@ impl CountStrategy for CountMedianBiasStrategy {
     derive(Deserialize, Serialize),
     serde(crate = "serde_crate")
 )]
-pub struct CountMinSketch<T, U> {
+pub struct CountMinSketch<T, U, B = SipHasherBuilder> {
     // A 2D grid represented as a 1D vector of signed 64-bit integers to support removals and
     // negatives.
     rows: usize,
     cols: usize,
     items: i64,
     grid: Vec<i64>,
-    hashers: [SipHasher; 2],
+    hasher: DoubleHasher<U, B>,
     _marker: PhantomData<(T, U)>,
 }
 
@@ -123,7 +123,7 @@ impl<T, U> CountMinSketch<T, U> {
             cols,
             items: 0,
             grid: vec![0; rows * cols],
-            hashers: util::get_hashers(),
+            hasher: DoubleHasher::new(),
             _marker: PhantomData,
         }
     }
@@ -149,7 +149,73 @@ impl<T, U> CountMinSketch<T, U> {
             cols,
             items: 0,
             grid: vec![0; rows * cols],
-            hashers: util::get_hashers(),
+            hasher: DoubleHasher::new(),
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<T, U, B> CountMinSketch<T, U, B>
+where
+    T: CountStrategy,
+    B: BuildHasher,
+{
+    /// Constructs a new, empty `CountMinSketch` with a specific number of rows and columns, and
+    /// two hasher builders for double hashing (`hash_builders`).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::count_min_sketch::{CountMinSketch, CountMinStrategy};
+    /// use probabilistic_collections::SipHasherBuilder;
+    ///
+    /// let count_min_sketch = CountMinSketch::<CountMinStrategy, String>::with_hashers(
+    ///     3,
+    ///     28,
+    ///     [SipHasherBuilder::from_seed(0, 0), SipHasherBuilder::from_seed(1, 1)],
+    /// );
+    ///
+    /// assert_eq!(count_min_sketch.rows(), 3);
+    /// assert_eq!(count_min_sketch.cols(), 28);
+    /// ```
+    pub fn with_hashers(rows: usize, cols: usize, hash_builders: [B; 2]) -> Self {
+        CountMinSketch {
+            rows,
+            cols,
+            items: 0,
+            grid: vec![0; rows * cols],
+            hasher: DoubleHasher::with_hashers(hash_builders),
+            _marker: PhantomData,
+        }
+    }
+
+    /// Constructs a new, empty `CountMinSketch` with a upper bound on the confidence (`epsilon`),
+    /// the error (`delta`), and two hasher builders for double hashing (`hash_builders`).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::count_min_sketch::{CountMinSketch, CountMinStrategy};
+    /// use probabilistic_collections::SipHasherBuilder;
+    ///
+    /// let count_min_sketch = CountMinSketch::<CountMinStrategy, String>::from_error_with_hashers(
+    ///     0.1,
+    ///     0.05,
+    ///     [SipHasherBuilder::from_seed(0, 0), SipHasherBuilder::from_seed(1, 1)],
+    /// );
+    ///
+    /// assert!(count_min_sketch.confidence() <= 0.1);
+    /// assert!(count_min_sketch.error() <= 0.05);
+    /// ```
+    pub fn from_error_with_hashers(epsilon: f64, delta: f64, hash_builders: [B; 2]) -> Self {
+        let rows = (1.0 / delta).ln().ceil() as usize;
+        let cols = ((1.0_f64).exp() / epsilon).ceil() as usize;
+        CountMinSketch {
+            rows,
+            cols,
+            items: 0,
+            grid: vec![0; rows * cols],
+            hasher: DoubleHasher::with_hashers(hash_builders),
             _marker: PhantomData,
         }
     }
@@ -171,11 +237,8 @@ impl<T, U> CountMinSketch<T, U> {
         V: Hash + ?Sized,
     {
         self.items += value;
-        let hashes = util::get_hashes::<U, V>(&self.hashers, item);
-        for row in 0..self.rows {
-            let mut offset = (row as u64).wrapping_mul(hashes[1]) % 0xFFFF_FFFF_FFFF_FFC5;
-            offset = hashes[0].wrapping_add(offset);
-            offset %= self.cols as u64;
+        for (row, hash) in self.hasher.hash(item).take(self.rows).enumerate() {
+            let offset = hash % self.cols as u64;
             self.grid[row * self.cols + offset as usize] += value;
         }
     }
@@ -213,7 +276,6 @@ impl<T, U> CountMinSketch<T, U> {
     /// ```
     pub fn count<V>(&self, item: &V) -> i64
     where
-        T: CountStrategy,
         U: Borrow<V>,
         V: Hash + ?Sized,
     {
@@ -221,7 +283,7 @@ impl<T, U> CountMinSketch<T, U> {
             row: 0,
             rows: self.rows,
             cols: self.cols,
-            hashes: util::get_hashes::<U, V>(&self.hashers, item),
+            hash_iter: self.hasher.hash(item),
             grid: &self.grid,
         };
         T::get_estimate(self.items, self.rows, self.cols, iter)
@@ -301,6 +363,20 @@ impl<T, U> CountMinSketch<T, U> {
     pub fn error(&self) -> f64 {
         1.0_f64 / (self.rows as f64).exp()
     }
+
+    /// Returns a reference to the count-min sketch's hasher builders.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::count_min_sketch::{CountMinSketch, CountMinStrategy};
+    ///
+    /// let count_min_sketch = CountMinSketch::<CountMinStrategy, String>::new(3, 28);
+    /// let hashers = count_min_sketch.hashers();
+    /// ```
+    pub fn hashers(&self) -> &[B; 2] {
+        &self.hasher.hashers()
+    }
 }
 
 /// An iterator that yields values corresponding to an item in the count-min sketch.
@@ -310,7 +386,7 @@ pub struct ItemValueIter<'a> {
     rows: usize,
     cols: usize,
     grid: &'a Vec<i64>,
-    hashes: [u64; 2],
+    hash_iter: HashIter,
 }
 
 impl<'a> Iterator for ItemValueIter<'a> {
@@ -321,12 +397,11 @@ impl<'a> Iterator for ItemValueIter<'a> {
             return None;
         }
 
-        let mut offset = (self.row as u64).wrapping_mul(self.hashes[1]) % 0xFFFF_FFFF_FFFF_FFC5;
-        offset = self.hashes[0].wrapping_add(offset);
-        offset %= self.cols as u64;
-        offset += (self.row * self.cols) as u64;
-        self.row += 1;
-        Some(self.grid[offset as usize])
+        self.hash_iter.next().map(|hash| {
+            let offset = (hash % self.cols as u64) + (self.row * self.cols) as u64;
+            self.row += 1;
+            self.grid[offset as usize]
+        })
     }
 }
 
@@ -337,10 +412,11 @@ mod tests {
             $(
                 mod $name {
                     use super::super::{CountMinSketch, $strategy};
+                    use crate::SipHasherBuilder;
 
                     #[test]
                     fn test_new() {
-                        let cms = CountMinSketch::<$strategy, String>::new(3, 28);
+                        let cms = CountMinSketch::<$strategy, String, SipHasherBuilder>::new(3, 28);
 
                         assert_eq!(cms.cols(), 28);
                         assert_eq!(cms.rows(), 3);
@@ -350,7 +426,7 @@ mod tests {
 
                     #[test]
                     fn test_from_error() {
-                        let cms = CountMinSketch::<$strategy, String>::from_error(0.1, 0.05);
+                        let cms = CountMinSketch::<$strategy, String, SipHasherBuilder>::from_error(0.1, 0.05);
 
                         assert_eq!(cms.cols(), 28);
                         assert_eq!(cms.rows(), 3);
@@ -360,14 +436,14 @@ mod tests {
 
                     #[test]
                     fn test_add() {
-                        let mut cms = CountMinSketch::<$strategy, String>::from_error(0.1, 0.05);
+                        let mut cms = CountMinSketch::<$strategy, String, SipHasherBuilder>::from_error(0.1, 0.05);
                         cms.add("foo", 3);
                         assert_eq!(cms.count("foo"), 3);
                     }
 
                     #[test]
                     fn test_remove() {
-                        let mut cms = CountMinSketch::<$strategy, String>::from_error(0.1, 0.05);
+                        let mut cms = CountMinSketch::<$strategy, String, SipHasherBuilder>::from_error(0.1, 0.05);
                         cms.add("foo", 3);
                         cms.remove("foo", 3);
                         assert_eq!(cms.count("foo"), 0);
@@ -375,7 +451,7 @@ mod tests {
 
                     #[test]
                     fn test_clear() {
-                        let mut cms = CountMinSketch::<$strategy, String>::from_error(0.1, 0.05);
+                        let mut cms = CountMinSketch::<$strategy, String, SipHasherBuilder>::from_error(0.1, 0.05);
                         cms.add("foo", 3);
                         cms.clear();
                         assert_eq!(cms.count("foo"), 0);
@@ -384,7 +460,7 @@ mod tests {
                     #[cfg(feature = "serde")]
                     #[test]
                     fn test_ser_de() {
-                        let mut cms = CountMinSketch::<$strategy, String>::from_error(0.1, 0.05);
+                        let mut cms = CountMinSketch::<$strategy, String, SipHasherBuilder>::from_error(0.1, 0.05);
                         cms.add("foo", 3);
 
                         let serialized_cms = bincode::serialize(&cms).unwrap();
@@ -395,14 +471,7 @@ mod tests {
                         assert_eq!(cms.cols, de_cms.cols);
                         assert_eq!(cms.items, de_cms.items);
                         assert_eq!(cms.grid, de_cms.grid);
-                        // SipHasher doesn't implement PartialEq, but it does implement Debug,
-                        // and its Debug impl does print all internal state.
-                        for i in 0..2 {
-                            assert_eq!(
-                                format!("{:?}", cms.hashers[i]),
-                                format!("{:?}", de_cms.hashers[i])
-                            );
-                        }
+                        assert_eq!(cms.hasher, de_cms.hasher);
                     }
                 }
             )*

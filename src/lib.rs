@@ -72,3 +72,6 @@ pub mod hyperloglog;
 pub mod quotient;
 pub mod similarity;
 mod util;
+
+pub use self::util::SipHasherBuilder;
+use self::util::{DoubleHasher, HashIter};

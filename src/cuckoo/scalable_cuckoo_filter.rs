@@ -1,8 +1,9 @@
 use crate::cuckoo::{CuckooFilter, DEFAULT_ENTRIES_PER_INDEX};
+use crate::SipHasherBuilder;
 #[cfg(feature = "serde")]
 use serde_crate::{Deserialize, Serialize};
 use std::borrow::Borrow;
-use std::hash::Hash;
+use std::hash::{BuildHasher, Hash};
 
 /// A growable, space-efficient probabilistic data structure to test for membership in a set.
 /// Scalable cuckoo filters also provide the flexibility to remove items.
@@ -43,8 +44,8 @@ use std::hash::Hash;
     derive(Deserialize, Serialize),
     serde(crate = "serde_crate")
 )]
-pub struct ScalableCuckooFilter<T> {
-    filters: Vec<CuckooFilter<T>>,
+pub struct ScalableCuckooFilter<T, B = SipHasherBuilder> {
+    filters: Vec<CuckooFilter<T, B>>,
     initial_item_count: usize,
     initial_fpp: f64,
     growth_ratio: f64,
@@ -53,7 +54,7 @@ pub struct ScalableCuckooFilter<T> {
 
 impl<T> ScalableCuckooFilter<T> {
     /// Constructs a new, empty `ScalableCuckooFilter` with an estimated initial item capacity of
-    /// `item_count` and an initial maximum false positive probability of `fpp`. Every time a new
+    /// `item_count`, and an initial maximum false positive probability of `fpp`. Every time a new
     /// cuckoo filter is added, the size will be approximately `growth_ratio` multiplied by the
     /// previous size, and the false positive probability will be `tightening_ratio` multipled by
     /// the previous false positive probability.
@@ -84,8 +85,9 @@ impl<T> ScalableCuckooFilter<T> {
     /// Constructs a new, empty `ScalableCuckooFilter` with an estimated initial item capacity of
     /// `item_count`, an initial maximum false positive probability of `fpp`, and
     /// `entries_per_index` entries per index. Every time a new cuckoo filter is added, the size
-    /// will be approximately `growth_ratio` multiplied by the previous size, and the false positive
-    /// probability will be `tightening_ratio` multipled by the previous false positive probability.
+    /// will be approximately `growth_ratio` multiplied by the previous size, and the false
+    /// positive probability will be `tightening_ratio` multipled by the previous false positive
+    /// probability.
     ///
     /// The length of each bucket will be rounded off to the next power of two.
     ///
@@ -115,6 +117,101 @@ impl<T> ScalableCuckooFilter<T> {
             tightening_ratio,
         }
     }
+}
+
+impl<T, B> ScalableCuckooFilter<T, B>
+where
+    B: BuildHasher + Clone + Copy,
+{
+    /// Constructs a new, empty `ScalableCuckooFilter` with an estimated initial item capacity of
+    /// `item_count`, an initial maximum false positive probability of `fpp`, and two hasher
+    /// builders for double hashing. Every time a new cuckoo filter is added, the size will be
+    /// approximately `growth_ratio` multiplied by the previous size, and the false positive
+    /// probability will be `tightening_ratio` multipled by the previous false positive
+    /// probability.
+    ///
+    /// The length of each bucket will be rounded off to the next power of two.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::cuckoo::ScalableCuckooFilter;
+    /// use probabilistic_collections::SipHasherBuilder;
+    ///
+    /// let filter = ScalableCuckooFilter::<String>::with_hashers(
+    ///     100,
+    ///     0.01,
+    ///     2.0,
+    ///     0.5,
+    ///     [SipHasherBuilder::from_seed(0, 0), SipHasherBuilder::from_seed(1, 1)],
+    /// );
+    /// ```
+    pub fn with_hashers(
+        item_count: usize,
+        fpp: f64,
+        growth_ratio: f64,
+        tightening_ratio: f64,
+        hash_builders: [B; 2],
+    ) -> Self {
+        ScalableCuckooFilter {
+            filters: vec![CuckooFilter::from_entries_per_index_with_hashers(
+                item_count,
+                fpp,
+                DEFAULT_ENTRIES_PER_INDEX,
+                hash_builders,
+            )],
+            initial_item_count: item_count,
+            initial_fpp: fpp,
+            growth_ratio,
+            tightening_ratio,
+        }
+    }
+
+    /// Constructs a new, empty `ScalableCuckooFilter` with an estimated initial item capacity of
+    /// `item_count`, an initial maximum false positive probability of `fpp`, `entries_per_index`
+    /// entries per index, and two hasher builders for double hashing. Every time a new cuckoo
+    /// filter is added, the size will be approximately `growth_ratio` multiplied by the previous
+    /// size, and the false positive probability will be `tightening_ratio` multipled by the
+    /// previous false positive probability.
+    ///
+    /// The length of each bucket will be rounded off to the next power of two.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::cuckoo::ScalableCuckooFilter;
+    /// use probabilistic_collections::SipHasherBuilder;
+    ///
+    /// let filter = ScalableCuckooFilter::<String>::from_entries_per_index_with_hashers(
+    ///     100,
+    ///     0.01,
+    ///     4,
+    ///     2.0,
+    ///     0.5,
+    ///     [SipHasherBuilder::from_seed(0, 0), SipHasherBuilder::from_seed(1, 1)],
+    /// );
+    /// ```
+    pub fn from_entries_per_index_with_hashers(
+        item_count: usize,
+        fpp: f64,
+        entries_per_index: usize,
+        growth_ratio: f64,
+        tightening_ratio: f64,
+        hash_builders: [B; 2],
+    ) -> Self {
+        ScalableCuckooFilter {
+            filters: vec![CuckooFilter::from_entries_per_index_with_hashers(
+                item_count,
+                fpp,
+                entries_per_index,
+                hash_builders,
+            )],
+            initial_item_count: item_count,
+            initial_fpp: fpp,
+            growth_ratio,
+            tightening_ratio,
+        }
+    }
 
     fn try_grow(&mut self) {
         let mut new_filter_opt = None;
@@ -125,25 +222,13 @@ impl<T> ScalableCuckooFilter<T> {
                 .last_mut()
                 .expect("Expected non-empty filters.");
 
-            if filter.is_nearly_full() {
-                let mut new_filter = CuckooFilter::from_entries_per_index(
+            if filter.is_nearly_full() || filter.len() == filter.capacity() {
+                new_filter_opt = Some(CuckooFilter::from_entries_per_index_with_hashers(
                     (filter.capacity() as f64 * self.growth_ratio).ceil() as usize,
                     self.initial_fpp * self.tightening_ratio.powi(exponent),
                     filter.entries_per_index(),
-                );
-
-                for fingerprint_entry in filter.extra_items.drain(..) {
-                    let index_1 = fingerprint_entry.1;
-                    let mut index_2 = fingerprint_entry.1 ^ fingerprint_entry.0 as usize;
-                    index_2 %= new_filter.bucket_len();
-                    let fingerprint = CuckooFilter::<T>::get_fingerprint(fingerprint_entry.0);
-                    // Should always have room in a new filter.
-                    if !new_filter.insert_fingerprint(fingerprint.as_slice(), index_1) {
-                        new_filter.insert_fingerprint(fingerprint.as_slice(), index_2);
-                    }
-                }
-
-                new_filter_opt = Some(new_filter);
+                    *filter.hashers(),
+                ));
             }
         }
 
@@ -225,7 +310,7 @@ impl<T> ScalableCuckooFilter<T> {
         }
     }
 
-    /// Returns the number of occupied entries in the cuckoo filter
+    /// Returns the number of occupied entries in the cuckoo filter.
     ///
     /// # Examples
     ///
@@ -237,7 +322,10 @@ impl<T> ScalableCuckooFilter<T> {
     /// assert_eq!(filter.len(), 0);
     /// ```
     pub fn len(&self) -> usize {
-        self.filters.iter().map(|filter| filter.len()).sum()
+        self.filters
+            .iter()
+            .map(|filter| filter.len() + filter.extra_items_len())
+            .sum()
     }
 
     /// Returns `true` if there are no occupied entries in the cuckoo filter.
@@ -317,16 +405,13 @@ impl<T> ScalableCuckooFilter<T> {
     /// assert!(!filter.contains("foo"));
     /// ```
     pub fn clear(&mut self) {
-        let default_entries_per_index = self
-            .filters
-            .first()
-            .expect("Expected non-empty filters.")
-            .entries_per_index();
+        let initial_filter = self.filters.first().expect("Expected non-empty filters.");
 
-        self.filters = vec![CuckooFilter::from_entries_per_index(
+        self.filters = vec![CuckooFilter::from_entries_per_index_with_hashers(
             self.initial_item_count,
             self.initial_fpp,
-            default_entries_per_index,
+            initial_filter.entries_per_index(),
+            *initial_filter.hashers(),
         )];
     }
 
@@ -350,106 +435,153 @@ impl<T> ScalableCuckooFilter<T> {
             .map(|filter| 1.0 - filter.estimated_fpp())
             .product::<f64>()
     }
+
+    /// Returns a reference to the scalable cuckoo filter's hasher builders.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::cuckoo::ScalableCuckooFilter;
+    ///
+    /// let filter = ScalableCuckooFilter::<String>::new(100, 0.01, 2.0, 0.5);
+    /// let hashers = filter.hashers();
+    /// ```
+    pub fn hashers(&self) -> &[B; 2] {
+        self.filters.first().expect("Expected non-empty filters.").hashers()
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::ScalableCuckooFilter;
+    use crate::util::tests::{HASH_BUILDER_1, HASH_BUILDER_2};
 
     #[test]
     pub fn test_new() {
+        let target_size = 130;
         let mut scf = ScalableCuckooFilter::<usize>::new(100, 0.01, 2.0, 0.5);
         assert_eq!(scf.len(), 0);
         assert!(scf.is_empty());
         assert_eq!(scf.capacity(), 128);
         assert_eq!(scf.entries_per_index(), 4);
 
-        for item in 0..130 {
-            scf.insert(&item);
+        let mut expected_len = 0;
+        let mut item = 0;
+        while expected_len != target_size {
+            if !scf.contains(&item) {
+                scf.insert(&item);
+                expected_len += 1;
+            }
+            item += 1;
         }
 
         scf.clear();
+        expected_len = 0;
+        assert_eq!(scf.len(), expected_len);
 
-        for item in 0..130 {
-            assert!(!scf.contains(&item));
+        for inserted_item in 0..item {
+            assert!(!scf.contains(&inserted_item));
         }
 
-        let mut expected_len = 0;
-        for item in 0..130 {
-            if scf.contains(&item) {
-                continue;
+        item = 0;
+        while expected_len != target_size {
+            if !scf.contains(&item) {
+                scf.insert(&item);
+                expected_len += 1;
+                assert!(scf.contains(&item));
+                assert_eq!(scf.len(), expected_len);
             }
-            scf.insert(&item);
-            expected_len += 1;
-            assert!(scf.contains(&item));
-            assert_eq!(scf.len(), expected_len);
+            item += 1;
         }
 
-        assert_eq!(scf.capacity(), 384);
         assert_eq!(scf.filter_count(), 2);
-        assert_eq!(scf.filters[0].extra_items_len(), 0);
-        assert_eq!(scf.filters[1].extra_items_len(), 0);
+        assert_eq!(scf.capacity(), 384);
         assert_eq!(scf.filters[0].fingerprint_bit_count(), 11);
         assert_eq!(scf.filters[1].fingerprint_bit_count(), 12);
 
-        for item in 0..130 {
-            if !scf.contains(&item) {
+        for inserted_item in 0..item {
+            if !scf.contains(&inserted_item) {
                 continue;
             }
-            scf.remove(&item);
+            scf.remove(&inserted_item);
             expected_len -= 1;
-            assert!(!scf.contains(&item));
+            assert!(!scf.contains(&inserted_item));
             assert_eq!(scf.len(), expected_len);
         }
+        assert!(scf.is_empty());
     }
 
     #[test]
     pub fn test_from_entries_per_index() {
+        let target_size = 130;
         let mut scf = ScalableCuckooFilter::<usize>::from_entries_per_index(100, 0.01, 8, 2.0, 0.5);
         assert_eq!(scf.len(), 0);
         assert!(scf.is_empty());
         assert_eq!(scf.capacity(), 128);
         assert_eq!(scf.entries_per_index(), 8);
 
-        for item in 0..130 {
-            scf.insert(&item);
+        let mut expected_len = 0;
+        let mut item = 0;
+        while expected_len != target_size {
+            if !scf.contains(&item) {
+                scf.insert(&item);
+                expected_len += 1;
+            }
+            item += 1;
         }
 
         scf.clear();
+        expected_len = 0;
+        assert_eq!(scf.len(), expected_len);
 
-        for item in 0..130 {
-            assert!(!scf.contains(&item));
+        for inserted_item in 0..item {
+            assert!(!scf.contains(&inserted_item));
         }
 
-        for item in 0..130 {
-            scf.insert(&item);
-            assert!(scf.contains(&item));
-            assert_eq!(scf.len(), item + 1);
+        item = 0;
+        while expected_len != target_size {
+            if !scf.contains(&item) {
+                scf.insert(&item);
+                expected_len += 1;
+                assert!(scf.contains(&item));
+                assert_eq!(scf.len(), expected_len);
+            }
+            item += 1;
         }
 
-        assert_eq!(scf.capacity(), 384);
         assert_eq!(scf.filter_count(), 2);
-        assert_eq!(scf.filters[0].extra_items_len(), 0);
-        assert_eq!(scf.filters[1].extra_items_len(), 0);
+        assert_eq!(scf.capacity(), 384);
         assert_eq!(scf.filters[0].fingerprint_bit_count(), 12);
         assert_eq!(scf.filters[1].fingerprint_bit_count(), 13);
 
-        for item in 0..130 {
-            scf.remove(&item);
-            assert!(!scf.contains(&item));
-            assert_eq!(scf.len(), 130 - item - 1);
+        for inserted_item in 0..item {
+            if !scf.contains(&inserted_item) {
+                continue;
+            }
+            scf.remove(&inserted_item);
+            expected_len -= 1;
+            assert!(!scf.contains(&inserted_item));
+            assert_eq!(scf.len(), expected_len);
         }
+        assert!(scf.is_empty());
     }
 
     #[test]
     fn test_estimated_fpp() {
-        let mut scf = ScalableCuckooFilter::<u32>::new(100, 0.01, 2.0, 0.5);
+        let mut scf = ScalableCuckooFilter::<u32>::with_hashers(
+            100,
+            0.01,
+            2.0,
+            0.5,
+            [HASH_BUILDER_1, HASH_BUILDER_2],
+        );
         assert!(scf.estimated_fpp() < std::f64::EPSILON);
 
         for item in 0..200 {
             scf.insert(&item);
         }
 
+        assert_eq!(scf.filters.len(), 2);
         let filter_fpp_0 = scf.filters[0].estimated_fpp();
         let filter_fpp_1 = scf.filters[1].estimated_fpp();
         let expected_fpp = 1.0 - (1.0 - filter_fpp_0) * (1.0 - filter_fpp_1);

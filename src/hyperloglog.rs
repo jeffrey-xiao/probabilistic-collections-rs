@@ -1,13 +1,14 @@
 //! Space-efficient probabilistic data structure for estimating the number of distinct items in a
 //! multiset.
 
-use rand::{Rng, XorShiftRng};
+use crate::SipHasherBuilder;
 #[cfg(feature = "serde")]
 use serde_crate::{Deserialize, Serialize};
-use siphasher::sip::SipHasher;
 use std::borrow::Borrow;
 use std::cmp;
 use std::f64;
+use std::fmt::Debug;
+use std::hash::BuildHasher;
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 
@@ -41,31 +42,16 @@ use std::marker::PhantomData;
     derive(Deserialize, Serialize),
     serde(crate = "serde_crate")
 )]
-pub struct HyperLogLog<T> {
+pub struct HyperLogLog<T, B = SipHasherBuilder> {
     alpha: f64,
     p: usize,
     registers: Vec<u8>,
-    hasher: SipHasher,
+    hash_builder: B,
     _marker: PhantomData<T>,
 }
 
 impl<T> HyperLogLog<T> {
-    fn get_hasher() -> SipHasher {
-        let mut rng = XorShiftRng::new_unseeded();
-        SipHasher::new_with_keys(rng.next_u64(), rng.next_u64())
-    }
-
-    fn get_alpha(p: usize) -> f64 {
-        assert!(4 <= p && p <= 16);
-        match p {
-            4 => 0.673,
-            5 => 0.697,
-            6 => 0.709,
-            p => 0.7213 / (1.0 + 1.079 / f64::from(1 << p)),
-        }
-    }
-
-    /// Constructs a new, empty `HyperLogLog<T>` with a given error probability;
+    /// Constructs a new, empty `HyperLogLog<T>` with a given error probability.
     ///
     /// # Panics
     ///
@@ -76,9 +62,42 @@ impl<T> HyperLogLog<T> {
     /// ```
     /// use probabilistic_collections::hyperloglog::HyperLogLog;
     ///
-    /// let hhl: HyperLogLog<u32> = HyperLogLog::<u32>::new(0.1);
+    /// let hhl = HyperLogLog::<u32>::new(0.1);
     /// ```
     pub fn new(error_probability: f64) -> Self {
+        Self::with_hasher(error_probability, SipHasherBuilder::from_entropy())
+    }
+}
+
+impl<T, B> HyperLogLog<T, B>
+where
+    B: BuildHasher,
+{
+    fn get_alpha(p: usize) -> f64 {
+        assert!(4 <= p && p <= 16);
+        match p {
+            4 => 0.673,
+            5 => 0.697,
+            6 => 0.709,
+            p => 0.7213 / (1.0 + 1.079 / f64::from(1 << p)),
+        }
+    }
+
+    /// Constructs a new, empty `HyperLogLog<T>` with a given error probability and hasher builder.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `error_probability` is not in (0, 1).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::hyperloglog::HyperLogLog;
+    /// use probabilistic_collections::SipHasherBuilder;
+    ///
+    /// let hhl = HyperLogLog::<u32, _>::with_hasher(0.1, SipHasherBuilder::from_entropy());
+    /// ```
+    pub fn with_hasher(error_probability: f64, hash_builder: B) -> Self {
         assert!(0.0 < error_probability && error_probability < 1.0);
         let p = (1.04 / error_probability).powi(2).ln().ceil() as usize;
         let alpha = Self::get_alpha(p);
@@ -87,7 +106,7 @@ impl<T> HyperLogLog<T> {
             alpha,
             p,
             registers: vec![0; registers_len],
-            hasher: Self::get_hasher(),
+            hash_builder,
             _marker: PhantomData,
         }
     }
@@ -108,9 +127,9 @@ impl<T> HyperLogLog<T> {
         T: Borrow<U>,
         U: Hash + ?Sized,
     {
-        let mut sip = self.hasher;
-        item.hash(&mut sip);
-        let hash = sip.finish();
+        let mut hasher = self.hash_builder.build_hasher();
+        item.hash(&mut hasher);
+        let hash = hasher.finish();
         let register_index = hash as usize & (self.registers.len() - 1);
         let value = (!hash >> self.p).trailing_zeros() as u8;
         self.registers[register_index] = cmp::max(self.registers[register_index], value + 1);
@@ -120,7 +139,8 @@ impl<T> HyperLogLog<T> {
     ///
     /// # Panics
     ///
-    /// Panics if the error probability of `self` is not equal to the error probability of `other`.
+    /// Panics if the error probability of `self` is not equal to the error probability of `other`
+    /// or if the hash builder of `self` is not equal to the hash builder of `other`.
     ///
     /// # Examples
     ///
@@ -132,7 +152,7 @@ impl<T> HyperLogLog<T> {
     /// hhl1.insert(&0);
     /// hhl1.insert(&1);
     ///
-    /// let mut hhl2 = HyperLogLog::<u32>::new(0.1);
+    /// let mut hhl2 = HyperLogLog::<u32>::with_hasher(0.1, *hhl1.hasher());
     /// hhl2.insert(&0);
     /// hhl2.insert(&2);
     ///
@@ -140,8 +160,12 @@ impl<T> HyperLogLog<T> {
     ///
     /// assert!((hhl1.len().round() - 3.0).abs() < EPSILON);
     /// ```
-    pub fn merge(&mut self, other: &HyperLogLog<T>) {
+    pub fn merge(&mut self, other: &HyperLogLog<T, B>)
+    where
+        B: Debug + PartialEq,
+    {
         assert_eq!(self.p, other.p);
+        assert_eq!(self.hash_builder, other.hash_builder);
 
         for (index, value) in self.registers.iter_mut().enumerate() {
             *value = cmp::max(*value, other.registers[index]);
@@ -230,6 +254,20 @@ impl<T> HyperLogLog<T> {
             *value = 0;
         }
     }
+
+    /// Returns a reference to the HyperLogLog's hasher builder.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::hyperloglog::HyperLogLog;
+    ///
+    /// let hhl = HyperLogLog::<String>::new(0.1);
+    /// let hasher = hhl.hasher();
+    /// ```
+    pub fn hasher(&self) -> &B {
+        &self.hash_builder
+    }
 }
 
 #[cfg(test)]
@@ -240,14 +278,14 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_panic_new_invalid_error_probability() {
-        let _hhl: HyperLogLog<u32> = HyperLogLog::<u32>::new(0.0);
+        let _hhl = HyperLogLog::<u32>::new(0.0);
     }
 
     #[test]
     #[should_panic]
     fn test_panic_new_mismatch_error_iprobability() {
-        let mut hhl1: HyperLogLog<u32> = HyperLogLog::<u32>::new(0.1);
-        let hhl2: HyperLogLog<u32> = HyperLogLog::<u32>::new(0.2);
+        let mut hhl1 = HyperLogLog::<u32>::new(0.1);
+        let hhl2 = HyperLogLog::<u32>::new(0.2);
         hhl1.merge(&hhl2);
     }
 
@@ -276,7 +314,7 @@ mod tests {
             hhl1.insert(&key);
         }
 
-        let mut hhl2 = HyperLogLog::<u32>::new(0.01);
+        let mut hhl2 = HyperLogLog::<u32>::with_hasher(0.01, *hhl1.hasher());
 
         for key in &[0, 1, 3, 0, 1, 3] {
             hhl2.insert(&key);
@@ -304,8 +342,6 @@ mod tests {
         assert!((hhl.alpha - de_hhl.alpha).abs() < EPSILON);
         assert_eq!(hhl.p, de_hhl.p);
         assert_eq!(hhl.registers, de_hhl.registers);
-        // SipHasher doesn't implement PartialEq, but it does implement Debug,
-        // and its Debug impl does print all internal state.
-        assert_eq!(format!("{:?}", hhl.hasher), format!("{:?}", de_hhl.hasher));
+        assert_eq!(hhl.hash_builder, de_hhl.hash_builder);
     }
 }

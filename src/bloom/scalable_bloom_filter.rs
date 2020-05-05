@@ -1,8 +1,9 @@
 use crate::bloom::BloomFilter;
+use crate::SipHasherBuilder;
 #[cfg(feature = "serde")]
 use serde_crate::{Deserialize, Serialize};
 use std::borrow::Borrow;
-use std::hash::Hash;
+use std::hash::{BuildHasher, Hash};
 
 /// A growable, space-efficient probabilistic data structure to test for membership in a set.
 ///
@@ -35,8 +36,8 @@ use std::hash::Hash;
     derive(Deserialize, Serialize),
     serde(crate = "serde_crate")
 )]
-pub struct ScalableBloomFilter<T> {
-    filters: Vec<BloomFilter<T>>,
+pub struct ScalableBloomFilter<T, B = SipHasherBuilder> {
+    filters: Vec<BloomFilter<T, B>>,
     approximate_bits_used: usize,
     initial_fpp: f64,
     growth_ratio: f64,
@@ -44,8 +45,8 @@ pub struct ScalableBloomFilter<T> {
 }
 
 impl<T> ScalableBloomFilter<T> {
-    /// Constructs a new, empty `ScalableBloomFilter` with initially `initial_bit_count` bits and
-    /// an initial maximum false positive probability of `fpp`. Every time a new bloom filter is
+    /// Constructs a new, empty `ScalableBloomFilter` with initially `initial_bit_count` bits, an
+    /// initial maximum false positive probability of `fpp`. Every time a new bloom filter is
     /// added, the size will be `growth_ratio` multiplied by the previous size, and the false
     /// positive probability will be `tightening_ratio` multipled by the previous false positive
     /// probability.
@@ -63,8 +64,56 @@ impl<T> ScalableBloomFilter<T> {
         growth_ratio: f64,
         tightening_ratio: f64,
     ) -> Self {
+        Self::with_hashers(
+            initial_bit_count,
+            fpp,
+            growth_ratio,
+            tightening_ratio,
+            [
+                SipHasherBuilder::from_entropy(),
+                SipHasherBuilder::from_entropy(),
+            ],
+        )
+    }
+}
+
+impl<T, B> ScalableBloomFilter<T, B>
+where
+    B: BuildHasher + Clone + Copy,
+{
+    /// Constructs a new, empty `ScalableBloomFilter` with initially `initial_bit_count` bits, an
+    /// initial maximum false positive probability of `fpp`, and two hasher builders for double
+    /// hashing. Every time a new bloom filter is added, the size will be `growth_ratio` multiplied
+    /// by the previous size, and the false positive probability will be `tightening_ratio`
+    /// multipled by the previous false positive probability.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::bloom::ScalableBloomFilter;
+    /// use probabilistic_collections::SipHasherBuilder;
+    ///
+    /// let filter = ScalableBloomFilter::<String>::with_hashers(
+    ///     100,
+    ///     0.01,
+    ///     2.0,
+    ///     0.5,
+    ///     [SipHasherBuilder::from_seed(0, 0), SipHasherBuilder::from_seed(1, 1)],
+    /// );
+    /// ```
+    pub fn with_hashers(
+        initial_bit_count: usize,
+        fpp: f64,
+        growth_ratio: f64,
+        tightening_ratio: f64,
+        hash_builders: [B; 2],
+    ) -> Self {
         ScalableBloomFilter {
-            filters: vec![BloomFilter::from_fpp(initial_bit_count, fpp)],
+            filters: vec![BloomFilter::from_fpp_with_hashers(
+                initial_bit_count,
+                fpp,
+                hash_builders,
+            )],
             approximate_bits_used: 0,
             initial_fpp: fpp,
             growth_ratio,
@@ -81,9 +130,10 @@ impl<T> ScalableBloomFilter<T> {
                 self.approximate_bits_used = filter.count_ones();
                 if self.approximate_bits_used * 2 >= filter.len() {
                     let exponent = self.filters.len() as i32;
-                    new_filter = Some(BloomFilter::from_fpp(
+                    new_filter = Some(BloomFilter::from_fpp_with_hashers(
                         (filter.len() as f64 * self.growth_ratio).ceil() as usize,
                         self.initial_fpp * self.tightening_ratio.powi(exponent),
+                        *filter.hashers(),
                     ));
                     self.approximate_bits_used = 0;
                 }
@@ -203,12 +253,12 @@ impl<T> ScalableBloomFilter<T> {
     /// assert!(!filter.contains("foo"));
     /// ```
     pub fn clear(&mut self) {
-        let initial_bit_count = self
-            .filters
-            .first()
-            .expect("Expected non-empty filters.")
-            .len();
-        self.filters = vec![BloomFilter::from_fpp(initial_bit_count, self.initial_fpp)];
+        let initial_filter = self.filters.first().expect("Expected non-empty filters.");
+        self.filters = vec![BloomFilter::from_fpp_with_hashers(
+            initial_filter.len(),
+            self.initial_fpp,
+            *initial_filter.hashers(),
+        )];
         self.approximate_bits_used = 0;
     }
 
@@ -218,8 +268,15 @@ impl<T> ScalableBloomFilter<T> {
     ///
     /// ```
     /// use probabilistic_collections::bloom::ScalableBloomFilter;
+    /// use probabilistic_collections::SipHasherBuilder;
     ///
-    /// let mut filter = ScalableBloomFilter::<String>::new(100, 0.01, 2.0, 0.5);
+    /// let mut filter = ScalableBloomFilter::<String>::with_hashers(
+    ///     100,
+    ///     0.01,
+    ///     2.0,
+    ///     0.5,
+    ///     [SipHasherBuilder::from_seed(0, 0), SipHasherBuilder::from_seed(1, 1)],
+    /// );
     /// filter.insert("foo");
     ///
     /// assert_eq!(filter.count_ones(), 7);
@@ -234,8 +291,15 @@ impl<T> ScalableBloomFilter<T> {
     ///
     /// ```
     /// use probabilistic_collections::bloom::ScalableBloomFilter;
+    /// use probabilistic_collections::SipHasherBuilder;
     ///
-    /// let mut filter = ScalableBloomFilter::<String>::new(100, 0.01, 2.0, 0.5);
+    /// let mut filter = ScalableBloomFilter::<String>::with_hashers(
+    ///     100,
+    ///     0.01,
+    ///     2.0,
+    ///     0.5,
+    ///     [SipHasherBuilder::from_seed(0, 0), SipHasherBuilder::from_seed(1, 1)],
+    /// );
     /// filter.insert("foo");
     ///
     /// assert_eq!(filter.count_zeros(), 93);
@@ -266,15 +330,36 @@ impl<T> ScalableBloomFilter<T> {
             .map(|filter| 1.0 - filter.estimated_fpp())
             .product::<f64>()
     }
+
+    /// Returns a reference to the scalable cuckoo filter's hasher builders.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::bloom::ScalableBloomFilter;
+    ///
+    /// let filter = ScalableBloomFilter::<String>::new(100, 0.01, 2.0, 0.5);
+    /// let hashers = filter.hashers();
+    /// ```
+    pub fn hashers(&self) -> &[B; 2] {
+        self.filters.first().expect("Expected non-empty filters.").hashers()
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::ScalableBloomFilter;
+    use crate::util::tests::{HASH_BUILDER_1, HASH_BUILDER_2};
 
     #[test]
     fn test_scalable_bloom_filter() {
-        let mut filter = ScalableBloomFilter::<String>::new(100, 0.01, 2.0, 0.5);
+        let mut filter = ScalableBloomFilter::<String>::with_hashers(
+            100,
+            0.01,
+            2.0,
+            0.5,
+            [HASH_BUILDER_1, HASH_BUILDER_2],
+        );
 
         assert!(!filter.contains("foo"));
         filter.insert("foo");
@@ -293,7 +378,13 @@ mod tests {
 
     #[test]
     fn test_grow() {
-        let mut filter = ScalableBloomFilter::<u32>::new(100, 0.01, 2.0, 0.5);
+        let mut filter = ScalableBloomFilter::<u32>::with_hashers(
+            100,
+            0.01,
+            2.0,
+            0.5,
+            [HASH_BUILDER_1, HASH_BUILDER_2],
+        );
 
         for i in 0..15 {
             filter.insert(&i);
@@ -307,13 +398,20 @@ mod tests {
 
     #[test]
     fn test_estimated_fpp() {
-        let mut filter = ScalableBloomFilter::<u32>::new(700, 0.01, 2.0, 0.5);
+        let mut filter = ScalableBloomFilter::<u32>::with_hashers(
+            800,
+            0.01,
+            2.0,
+            0.5,
+            [HASH_BUILDER_1, HASH_BUILDER_2],
+        );
         assert!(filter.estimated_fpp() < std::f64::EPSILON);
 
         for item in 0..200 {
             filter.insert(&item);
         }
 
+        assert_eq!(filter.filter_count(), 2);
         let fpp_0 = 1.0 - filter.filters[0].estimated_fpp();
         let fpp_1 = 1.0 - filter.filters[1].estimated_fpp();
         let expected_fpp = 1.0 - (fpp_0 * fpp_1);

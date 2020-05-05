@@ -1,15 +1,12 @@
 use crate::bit_vec::BitVec;
-use crate::util;
+use crate::{DoubleHasher, HashIter, SipHasherBuilder};
 use rand::{Rng, XorShiftRng};
 #[cfg(feature = "serde")]
 use serde_crate::{Deserialize, Serialize};
-use siphasher::sip::SipHasher;
 use std::borrow::Borrow;
 use std::f64::consts;
-use std::hash::Hash;
+use std::hash::{BuildHasher, Hash};
 use std::marker::PhantomData;
-
-const PRIME: u64 = 0xFFFF_FFFF_FFFF_FFC5;
 
 /// A space-efficient probabilistic data structure for data deduplication in streams.
 ///
@@ -40,9 +37,9 @@ const PRIME: u64 = 0xFFFF_FFFF_FFFF_FFC5;
     derive(Deserialize, Serialize),
     serde(crate = "serde_crate")
 )]
-pub struct BSBloomFilter<T> {
+pub struct BSBloomFilter<T, B = SipHasherBuilder> {
     bit_vec: BitVec,
-    hashers: [SipHasher; 2],
+    hasher: DoubleHasher<T, B>,
     #[cfg_attr(feature = "serde", serde(skip, default = "XorShiftRng::new_unseeded"))]
     rng: XorShiftRng,
     bit_count: usize,
@@ -51,11 +48,7 @@ pub struct BSBloomFilter<T> {
 }
 
 impl<T> BSBloomFilter<T> {
-    fn get_hasher_count(fpp: f64) -> usize {
-        ((1.0 + fpp.ln() / (1.0 - 1.0 / consts::E).ln() + 1.0) / 2.0).ceil() as usize
-    }
-
-    /// Constructs a new, empty `BSBloomFilter` with `bit_count` bits per filter and a false
+    /// Constructs a new, empty `BSBloomFilter` with `bit_count` bits per filter, and a false
     /// positive probability of `fpp`.
     ///
     /// # Examples
@@ -66,15 +59,46 @@ impl<T> BSBloomFilter<T> {
     /// let filter = BSBloomFilter::<String>::new(10, 0.01);
     /// ```
     pub fn new(bit_count: usize, fpp: f64) -> Self {
+        Self::with_hashers(
+            bit_count,
+            fpp,
+            [
+                SipHasherBuilder::from_entropy(),
+                SipHasherBuilder::from_entropy(),
+            ],
+        )
+    }
+}
+
+impl<T, B> BSBloomFilter<T, B>
+where
+    B: BuildHasher,
+{
+    fn get_hasher_count(fpp: f64) -> usize {
+        ((1.0 + fpp.ln() / (1.0 - 1.0 / consts::E).ln() + 1.0) / 2.0).ceil() as usize
+    }
+
+    /// Constructs a new, empty `BSBloomFilter` with `bit_count` bits per filter, a false
+    /// positive probability of `fpp`, and two hash builders for double hashing.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::bloom::BSBloomFilter;
+    /// use probabilistic_collections::SipHasherBuilder;
+    ///
+    /// let filter = BSBloomFilter::<String>::with_hashers(
+    ///     10,
+    ///     0.01,
+    ///     [SipHasherBuilder::from_seed(0, 0), SipHasherBuilder::from_seed(1, 1)],
+    /// );
+    /// ```
+    pub fn with_hashers(bit_count: usize, fpp: f64, hash_builders: [B; 2]) -> Self {
         let hasher_count = Self::get_hasher_count(fpp);
-        let mut rng = XorShiftRng::new_unseeded();
         BSBloomFilter {
             bit_vec: BitVec::new(bit_count * hasher_count),
-            hashers: [
-                SipHasher::new_with_keys(rng.next_u64(), rng.next_u64()),
-                SipHasher::new_with_keys(rng.next_u64(), rng.next_u64()),
-            ],
-            rng,
+            hasher: DoubleHasher::with_hashers(hash_builders),
+            rng: XorShiftRng::new_unseeded(),
             bit_count,
             hasher_count,
             _marker: PhantomData,
@@ -97,23 +121,20 @@ impl<T> BSBloomFilter<T> {
         T: Borrow<U>,
         U: Hash + ?Sized,
     {
-        let hashes = util::get_hashes::<T, U>(&self.hashers, item);
+        let hashes = self.hasher.hash(item);
         if !self.contains_hashes(hashes) {
-            let bit_count = self.bit_count();
-
             (0..self.hasher_count).for_each(|index| {
-                let index = index * bit_count + self.rng.gen_range(0, bit_count);
+                let index = index * self.bit_count + self.rng.gen_range(0, self.bit_count);
                 self.bit_vec.set(index, false);
             });
 
-            for index in 0..self.hasher_count {
-                let mut offset = (index as u64).wrapping_mul(hashes[1]) % PRIME;
-                offset = hashes[0].wrapping_add(offset);
-                offset %= self.bit_count as u64;
-                offset += (index * self.bit_count) as u64;
-
-                self.bit_vec.set(offset as usize, true);
-            }
+            hashes
+                .take(self.hasher_count)
+                .enumerate()
+                .for_each(|(index, hash)| {
+                    let offset = (hash % self.bit_count as u64) + (index * self.bit_count) as u64;
+                    self.bit_vec.set(offset as usize, true);
+                })
         }
     }
 
@@ -135,18 +156,17 @@ impl<T> BSBloomFilter<T> {
         T: Borrow<U>,
         U: Hash + ?Sized,
     {
-        let hashes = util::get_hashes::<T, U>(&self.hashers, item);
-        self.contains_hashes(hashes)
+        self.contains_hashes(self.hasher.hash(item))
     }
 
-    fn contains_hashes(&self, hashes: [u64; 2]) -> bool {
-        (0..self.hasher_count).all(|index| {
-            let mut offset = (index as u64).wrapping_mul(hashes[1]) % PRIME;
-            offset = hashes[0].wrapping_add(offset);
-            offset %= self.bit_count as u64;
-            offset += (index * self.bit_count) as u64;
-            self.bit_vec[offset as usize]
-        })
+    fn contains_hashes(&self, hashes: HashIter) -> bool {
+        hashes
+            .take(self.hasher_count)
+            .enumerate()
+            .all(|(index, hash)| {
+                let offset = (hash % self.bit_count as u64) + (index * self.bit_count) as u64;
+                self.bit_vec[offset as usize]
+            })
     }
 
     /// Returns the number of bits in the bloom filter.
@@ -257,6 +277,20 @@ impl<T> BSBloomFilter<T> {
     /// ```
     pub fn count_zeros(&self) -> usize {
         self.bit_vec.count_zeros()
+    }
+
+    /// Returns a reference to the bloom filter's hasher builders.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::bloom::BSBloomFilter;
+    ///
+    /// let filter = BSBloomFilter::<String>::new(10, 0.01);
+    /// let hashers = filter.hashers();
+    /// ```
+    pub fn hashers(&self) -> &[B; 2] {
+        return &self.hasher.hashers();
     }
 }
 
@@ -289,9 +323,9 @@ impl<T> BSBloomFilter<T> {
     derive(Deserialize, Serialize),
     serde(crate = "serde_crate")
 )]
-pub struct BSSDBloomFilter<T> {
+pub struct BSSDBloomFilter<T, B = SipHasherBuilder> {
     bit_vec: BitVec,
-    hashers: [SipHasher; 2],
+    hasher: DoubleHasher<T, B>,
     #[cfg_attr(feature = "serde", serde(skip, default = "XorShiftRng::new_unseeded"))]
     rng: XorShiftRng,
     bit_count: usize,
@@ -300,11 +334,7 @@ pub struct BSSDBloomFilter<T> {
 }
 
 impl<T> BSSDBloomFilter<T> {
-    fn get_hasher_count(fpp: f64) -> usize {
-        ((1.0 + fpp.ln() / (1.0 - 1.0 / consts::E).ln() + 1.0) / 2.0).ceil() as usize
-    }
-
-    /// Constructs a new, empty `BSSDBloomFilter` with `bit_count` bits per filter and a false
+    /// Constructs a new, empty `BSSDBloomFilter` with `bit_count` bits per filter, and a false
     /// positive probability of `fpp`.
     ///
     /// # Examples
@@ -315,15 +345,46 @@ impl<T> BSSDBloomFilter<T> {
     /// let filter = BSSDBloomFilter::<String>::new(10, 0.01);
     /// ```
     pub fn new(bit_count: usize, fpp: f64) -> Self {
+        Self::with_hashers(
+            bit_count,
+            fpp,
+            [
+                SipHasherBuilder::from_entropy(),
+                SipHasherBuilder::from_entropy(),
+            ],
+        )
+    }
+}
+
+impl<T, B> BSSDBloomFilter<T, B>
+where
+    B: BuildHasher,
+{
+    fn get_hasher_count(fpp: f64) -> usize {
+        ((1.0 + fpp.ln() / (1.0 - 1.0 / consts::E).ln() + 1.0) / 2.0).ceil() as usize
+    }
+
+    /// Constructs a new, empty `BSSDBloomFilter` with `bit_count` bits per filter, a false
+    /// positive probability of `fpp`, and two hash builders for double hashing.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::bloom::BSSDBloomFilter;
+    /// use probabilistic_collections::SipHasherBuilder;
+    ///
+    /// let filter = BSSDBloomFilter::<String>::with_hashers(
+    ///     10,
+    ///     0.01,
+    ///     [SipHasherBuilder::from_seed(0, 0), SipHasherBuilder::from_seed(1, 1)],
+    /// );
+    /// ```
+    pub fn with_hashers(bit_count: usize, fpp: f64, hash_builders: [B; 2]) -> Self {
         let hasher_count = Self::get_hasher_count(fpp);
-        let mut rng = XorShiftRng::new_unseeded();
         BSSDBloomFilter {
             bit_vec: BitVec::new(bit_count * hasher_count),
-            hashers: [
-                SipHasher::new_with_keys(rng.next_u64(), rng.next_u64()),
-                SipHasher::new_with_keys(rng.next_u64(), rng.next_u64()),
-            ],
-            rng,
+            hasher: DoubleHasher::with_hashers(hash_builders),
+            rng: XorShiftRng::new_unseeded(),
             bit_count,
             hasher_count,
             _marker: PhantomData,
@@ -346,23 +407,21 @@ impl<T> BSSDBloomFilter<T> {
         T: Borrow<U>,
         U: Hash + ?Sized,
     {
-        if !self.contains(item) {
-            let hashes = util::get_hashes::<T, U>(&self.hashers, item);
-            let bit_count = self.bit_count();
-
+        let hashes = self.hasher.hash(item);
+        if !self.contains_hashes(hashes) {
             let filter_index = self.rng.gen_range(0, self.hasher_count);
             let index = self.rng.gen_range(0, self.bit_count);
 
-            self.bit_vec.set(filter_index * bit_count + index, false);
+            self.bit_vec
+                .set(filter_index * self.bit_count + index, false);
 
-            for index in 0..self.hasher_count {
-                let mut offset = (index as u64).wrapping_mul(hashes[1]) % PRIME;
-                offset = hashes[0].wrapping_add(offset);
-                offset %= self.bit_count as u64;
-                offset += (index * self.bit_count) as u64;
-
-                self.bit_vec.set(offset as usize, true);
-            }
+            hashes
+                .take(self.hasher_count)
+                .enumerate()
+                .for_each(|(index, hash)| {
+                    let offset = (hash % self.bit_count as u64) + (index * self.bit_count) as u64;
+                    self.bit_vec.set(offset as usize, true);
+                })
         }
     }
 
@@ -384,14 +443,17 @@ impl<T> BSSDBloomFilter<T> {
         T: Borrow<U>,
         U: Hash + ?Sized,
     {
-        let hashes = util::get_hashes::<T, U>(&self.hashers, item);
-        (0..self.hasher_count).all(|index| {
-            let mut offset = (index as u64).wrapping_mul(hashes[1]) % PRIME;
-            offset = hashes[0].wrapping_add(offset);
-            offset %= self.bit_count as u64;
-            offset += (index * self.bit_count) as u64;
-            self.bit_vec[offset as usize]
-        })
+        self.contains_hashes(self.hasher.hash(item))
+    }
+
+    fn contains_hashes(&self, hashes: HashIter) -> bool {
+        hashes
+            .take(self.hasher_count)
+            .enumerate()
+            .all(|(index, hash)| {
+                let offset = (hash % self.bit_count as u64) + (index * self.bit_count) as u64;
+                self.bit_vec[offset as usize]
+            })
     }
 
     /// Returns the number of bits in the bloom filter.
@@ -503,6 +565,20 @@ impl<T> BSSDBloomFilter<T> {
     pub fn count_zeros(&self) -> usize {
         self.bit_vec.count_zeros()
     }
+
+    /// Returns a reference to the bloom filter's hasher builders.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::bloom::BSSDBloomFilter;
+    ///
+    /// let filter = BSSDBloomFilter::<String>::new(10, 0.01);
+    /// let hashers = filter.hashers();
+    /// ```
+    pub fn hashers(&self) -> &[B; 2] {
+        return &self.hasher.hashers();
+    }
 }
 
 /// A space-efficient probabilistic data structure for data deduplication in streams.
@@ -534,9 +610,9 @@ impl<T> BSSDBloomFilter<T> {
     derive(Deserialize, Serialize),
     serde(crate = "serde_crate")
 )]
-pub struct RLBSBloomFilter<T> {
+pub struct RLBSBloomFilter<T, B = SipHasherBuilder> {
     bit_vecs: Vec<BitVec>,
-    hashers: [SipHasher; 2],
+    hasher: DoubleHasher<T, B>,
     #[cfg_attr(feature = "serde", serde(skip, default = "XorShiftRng::new_unseeded"))]
     rng: XorShiftRng,
     bit_count: usize,
@@ -545,11 +621,7 @@ pub struct RLBSBloomFilter<T> {
 }
 
 impl<T> RLBSBloomFilter<T> {
-    fn get_hasher_count(fpp: f64) -> usize {
-        ((1.0 + fpp.ln() / (1.0 - 1.0 / consts::E).ln() + 1.0) / 2.0).ceil() as usize
-    }
-
-    /// Constructs a new, empty `RLBSBloomFilter` with `bit_count` bits per filter and a false
+    /// Constructs a new, empty `RLBSBloomFilter` with `bit_count` bits per filter, and a false
     /// positive probability of `fpp`.
     ///
     /// # Examples
@@ -560,15 +632,46 @@ impl<T> RLBSBloomFilter<T> {
     /// let filter = RLBSBloomFilter::<String>::new(10, 0.01);
     /// ```
     pub fn new(bit_count: usize, fpp: f64) -> Self {
+        Self::with_hashers(
+            bit_count,
+            fpp,
+            [
+                SipHasherBuilder::from_entropy(),
+                SipHasherBuilder::from_entropy(),
+            ],
+        )
+    }
+}
+
+impl<T, B> RLBSBloomFilter<T, B>
+where
+    B: BuildHasher,
+{
+    fn get_hasher_count(fpp: f64) -> usize {
+        ((1.0 + fpp.ln() / (1.0 - 1.0 / consts::E).ln() + 1.0) / 2.0).ceil() as usize
+    }
+
+    /// Constructs a new, empty `RLBSBloomFilter` with `bit_count` bits per filter, a false
+    /// positive probability of `fpp`, and two hash builders for double hashing.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::bloom::RLBSBloomFilter;
+    /// use probabilistic_collections::SipHasherBuilder;
+    ///
+    /// let filter = RLBSBloomFilter::<String>::with_hashers(
+    ///     10,
+    ///     0.01,
+    ///     [SipHasherBuilder::from_seed(0, 0), SipHasherBuilder::from_seed(1, 1)],
+    /// );
+    /// ```
+    pub fn with_hashers(bit_count: usize, fpp: f64, hash_builders: [B; 2]) -> Self {
         let hasher_count = Self::get_hasher_count(fpp);
-        let mut rng = XorShiftRng::new_unseeded();
         RLBSBloomFilter {
             bit_vecs: vec![BitVec::new(bit_count); hasher_count],
-            hashers: [
-                SipHasher::new_with_keys(rng.next_u64(), rng.next_u64()),
-                SipHasher::new_with_keys(rng.next_u64(), rng.next_u64()),
-            ],
-            rng,
+            hasher: DoubleHasher::with_hashers(hash_builders),
+            rng: XorShiftRng::new_unseeded(),
             bit_count,
             hasher_count,
             _marker: PhantomData,
@@ -591,25 +694,23 @@ impl<T> RLBSBloomFilter<T> {
         T: Borrow<U>,
         U: Hash + ?Sized,
     {
-        if !self.contains(item) {
-            let hashes = util::get_hashes::<T, U>(&self.hashers, item);
-            let bit_count = self.bit_count();
-
+        let hashes = self.hasher.hash(item);
+        if !self.contains_hashes(hashes) {
             (0..self.hasher_count).for_each(|filter_index| {
-                let prob = self.bit_vecs[filter_index].count_ones() as f64 / bit_count as f64;
-                let index = self.rng.gen_range(0, bit_count);
+                let prob = self.bit_vecs[filter_index].count_ones() as f64 / self.bit_count as f64;
+                let index = self.rng.gen_range(0, self.bit_count);
                 if self.rng.gen::<f64>() < prob {
                     self.bit_vecs[filter_index].set(index, false);
                 }
             });
 
-            for filter_index in 0..self.hasher_count {
-                let mut offset = (filter_index as u64).wrapping_mul(hashes[1]) % PRIME;
-                offset = hashes[0].wrapping_add(offset);
-                offset %= self.bit_count as u64;
-
-                self.bit_vecs[filter_index].set(offset as usize, true);
-            }
+            hashes
+                .take(self.hasher_count)
+                .enumerate()
+                .for_each(|(filter_index, hash)| {
+                    let offset = hash % self.bit_count as u64;
+                    self.bit_vecs[filter_index].set(offset as usize, true);
+                })
         }
     }
 
@@ -631,13 +732,17 @@ impl<T> RLBSBloomFilter<T> {
         T: Borrow<U>,
         U: Hash + ?Sized,
     {
-        let hashes = util::get_hashes::<T, U>(&self.hashers, item);
-        (0..self.hasher_count).all(|filter_index| {
-            let mut offset = (filter_index as u64).wrapping_mul(hashes[1]) % PRIME;
-            offset = hashes[0].wrapping_add(offset);
-            offset %= self.bit_count as u64;
-            self.bit_vecs[filter_index][offset as usize]
-        })
+        self.contains_hashes(self.hasher.hash(item))
+    }
+
+    fn contains_hashes(&self, hashes: HashIter) -> bool {
+        hashes
+            .take(self.hasher_count)
+            .enumerate()
+            .all(|(filter_index, hash)| {
+                let offset = hash % self.bit_count as u64;
+                self.bit_vecs[filter_index][offset as usize]
+            })
     }
 
     /// Returns the number of bits in the bloom filter.
@@ -757,17 +862,31 @@ impl<T> RLBSBloomFilter<T> {
             .map(|bit_vec| bit_vec.count_zeros())
             .sum()
     }
+
+    /// Returns a reference to the bloom filter's hasher builders.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::bloom::RLBSBloomFilter;
+    ///
+    /// let filter = RLBSBloomFilter::<String>::new(10, 0.01);
+    /// let hashers = filter.hashers();
+    /// ```
+    pub fn hashers(&self) -> &[B; 2] {
+        return &self.hasher.hashers();
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::BSBloomFilter;
-    use super::BSSDBloomFilter;
-    use super::RLBSBloomFilter;
+    use super::{BSBloomFilter, BSSDBloomFilter, RLBSBloomFilter};
+    use crate::util::tests::{HASH_BUILDER_1, HASH_BUILDER_2};
 
     #[test]
     fn test_bs() {
-        let mut filter = BSBloomFilter::<String>::new(10, 0.01);
+        let mut filter =
+            BSBloomFilter::<String>::with_hashers(10, 0.01, [HASH_BUILDER_1, HASH_BUILDER_2]);
 
         assert!(!filter.contains("foo"));
         filter.insert("foo");
@@ -796,19 +915,13 @@ mod tests {
         assert_eq!(filter.bit_vec, de_filter.bit_vec);
         assert_eq!(filter.bit_count, de_filter.bit_count);
         assert_eq!(filter.hasher_count, de_filter.hasher_count);
-        // SipHasher doesn't implement PartialEq, but it does implement Debug,
-        // and its Debug impl does print all internal state.
-        for i in 0..2 {
-            assert_eq!(
-                format!("{:?}", filter.hashers[i]),
-                format!("{:?}", de_filter.hashers[i])
-            );
-        }
+        assert_eq!(filter.hasher, de_filter.hasher);
     }
 
     #[test]
     fn test_bssd() {
-        let mut filter = BSSDBloomFilter::<String>::new(10, 0.01);
+        let mut filter =
+            BSSDBloomFilter::<String>::with_hashers(10, 0.01, [HASH_BUILDER_1, HASH_BUILDER_2]);
 
         assert!(!filter.contains("foo"));
         filter.insert("foo");
@@ -837,19 +950,13 @@ mod tests {
         assert_eq!(filter.bit_vec, de_filter.bit_vec);
         assert_eq!(filter.bit_count, de_filter.bit_count);
         assert_eq!(filter.hasher_count, de_filter.hasher_count);
-        // SipHasher doesn't implement PartialEq, but it does implement Debug,
-        // and its Debug impl does print all internal state.
-        for i in 0..2 {
-            assert_eq!(
-                format!("{:?}", filter.hashers[i]),
-                format!("{:?}", de_filter.hashers[i])
-            );
-        }
+        assert_eq!(filter.hasher, de_filter.hasher);
     }
 
     #[test]
     fn test_rlbs() {
-        let mut filter = RLBSBloomFilter::<String>::new(10, 0.01);
+        let mut filter =
+            RLBSBloomFilter::<String>::with_hashers(10, 0.01, [HASH_BUILDER_1, HASH_BUILDER_2]);
 
         assert!(!filter.contains("foo"));
         filter.insert("foo");
@@ -878,13 +985,6 @@ mod tests {
         assert_eq!(filter.bit_vec, de_filter.bit_vec);
         assert_eq!(filter.bit_count, de_filter.bit_count);
         assert_eq!(filter.hasher_count, de_filter.hasher_count);
-        // SipHasher doesn't implement PartialEq, but it does implement Debug,
-        // and its Debug impl does print all internal state.
-        for i in 0..2 {
-            assert_eq!(
-                format!("{:?}", filter.hashers[i]),
-                format!("{:?}", de_filter.hashers[i])
-            );
-        }
+        assert_eq!(filter.hasher, de_filter.hasher);
     }
 }

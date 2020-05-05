@@ -1,7 +1,7 @@
-use crate::util;
+use crate::{DoubleHasher, SipHasherBuilder};
 #[cfg(feature = "serde")]
 use serde_crate::{Deserialize, Serialize};
-use siphasher::sip::SipHasher;
+use std::hash::BuildHasher;
 use std::hash::Hash;
 use std::marker::PhantomData;
 
@@ -15,15 +15,19 @@ use std::marker::PhantomData;
 ///
 /// ```
 /// use probabilistic_collections::similarity::{MinHash, ShingleIterator};
+/// use probabilistic_collections::SipHasherBuilder;
 ///
-/// let min_hash = MinHash::new(100);
+/// let min_hash = MinHash::with_hashers(
+///     100,
+///     [SipHasherBuilder::from_seed(0, 0), SipHasherBuilder::from_seed(1, 1)],
+/// );
 ///
 /// assert_eq!(
 ///     min_hash.get_similarity(
 ///         ShingleIterator::new(2, "the cat sat on a mat".split(' ').collect()),
 ///         ShingleIterator::new(2, "the cat sat on the mat".split(' ').collect()),
 ///     ),
-///     0.42,
+///     0.49,
 /// );
 /// ```
 #[cfg_attr(
@@ -31,13 +35,16 @@ use std::marker::PhantomData;
     derive(Deserialize, Serialize),
     serde(crate = "serde_crate")
 )]
-pub struct MinHash<T, U> {
-    hashers: [SipHasher; 2],
+pub struct MinHash<T, U, B = SipHasherBuilder> {
+    hasher: DoubleHasher<U, B>,
     hasher_count: usize,
     _marker: PhantomData<(T, U)>,
 }
 
-impl<T, U> MinHash<T, U> {
+impl<T, U> MinHash<T, U>
+where
+    T: Iterator<Item = U>,
+{
     /// Constructs a new `MinHash` with a specified number of hash functions to use.
     ///
     /// # Examples
@@ -45,11 +52,41 @@ impl<T, U> MinHash<T, U> {
     /// ```
     /// use probabilistic_collections::similarity::{MinHash, ShingleIterator};
     ///
-    /// let min_hash = MinHash::<ShingleIterator<&str>, &str>::new(100);
+    /// let min_hash = MinHash::<ShingleIterator<str>, _>::new(100);
     /// ```
     pub fn new(hasher_count: usize) -> Self {
+        Self::with_hashers(
+            hasher_count,
+            [
+                SipHasherBuilder::from_entropy(),
+                SipHasherBuilder::from_entropy(),
+            ],
+        )
+    }
+}
+
+impl<T, U, B> MinHash<T, U, B>
+where
+    T: Iterator<Item = U>,
+    B: BuildHasher,
+{
+    /// Constructs a new `MinHash` with a specified number of hash functions to use, and a hasher
+    /// builder.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::similarity::{MinHash, ShingleIterator};
+    /// use probabilistic_collections::SipHasherBuilder;
+    ///
+    /// let min_hash = MinHash::<ShingleIterator<str>, _>::with_hashers(
+    ///     100,
+    ///     [SipHasherBuilder::from_seed(0, 0), SipHasherBuilder::from_seed(1, 1)],
+    /// );
+    /// ```
+    pub fn with_hashers(hasher_count: usize, hash_builders: [B; 2]) -> Self {
         MinHash {
-            hashers: util::get_hashers(),
+            hasher: DoubleHasher::with_hashers(hash_builders),
             hasher_count,
             _marker: PhantomData,
         }
@@ -62,8 +99,12 @@ impl<T, U> MinHash<T, U> {
     ///
     /// ```
     /// use probabilistic_collections::similarity::{MinHash, ShingleIterator};
+    /// use probabilistic_collections::SipHasherBuilder;
     ///
-    /// let min_hash = MinHash::new(100);
+    /// let min_hash = MinHash::with_hashers(
+    ///     100,
+    ///     [SipHasherBuilder::from_seed(0, 0), SipHasherBuilder::from_seed(1, 1)],
+    /// );
     ///
     /// let shingles1 = ShingleIterator::new(2, "the cat sat on a mat".split(' ').collect());
     /// let shingles2 = ShingleIterator::new(2, "the cat sat on the mat".split(' ').collect());
@@ -72,22 +113,21 @@ impl<T, U> MinHash<T, U> {
     ///
     /// assert_eq!(
     ///     min_hash.get_similarity_from_hashes(&min_hashes1, &min_hashes2),
-    ///     0.42
+    ///     0.49,
     /// );
     /// ```
     pub fn get_min_hashes(&self, iter: T) -> Vec<u64>
     where
-        T: Iterator<Item = U>,
         U: Hash,
     {
-        let hash_pairs = iter
-            .map(|shingle| util::get_hashes::<&U, U>(&self.hashers, &shingle))
+        let mut hash_iters = iter
+            .map(|shingle| self.hasher.hash(&shingle))
             .collect::<Vec<_>>();
         (0..self.hasher_count)
-            .map(|index| {
-                hash_pairs
-                    .iter()
-                    .map(|hashes| util::get_hash(index, hashes))
+            .map(|_| {
+                hash_iters
+                    .iter_mut()
+                    .map(|hash_iter| hash_iter.next().expect("Expected hash"))
                     .min()
                     .expect("Expected non-zero `hasher_count` and shingles.")
             })
@@ -105,8 +145,12 @@ impl<T, U> MinHash<T, U> {
     ///
     /// ```
     /// use probabilistic_collections::similarity::{MinHash, ShingleIterator};
+    /// use probabilistic_collections::SipHasherBuilder;
     ///
-    /// let min_hash = MinHash::new(100);
+    /// let min_hash = MinHash::with_hashers(
+    ///     100,
+    ///     [SipHasherBuilder::from_seed(0, 0), SipHasherBuilder::from_seed(1, 1)],
+    /// );
     ///
     /// let shingles1 = ShingleIterator::new(2, "the cat sat on a mat".split(' ').collect());
     /// let shingles2 = ShingleIterator::new(2, "the cat sat on the mat".split(' ').collect());
@@ -115,7 +159,7 @@ impl<T, U> MinHash<T, U> {
     ///
     /// assert_eq!(
     ///     min_hash.get_similarity_from_hashes(&min_hashes1, &min_hashes2),
-    ///     0.42
+    ///     0.49,
     /// );
     /// ```
     pub fn get_similarity_from_hashes(&self, min_hashes_1: &[u64], min_hashes_2: &[u64]) -> f64 {
@@ -144,20 +188,23 @@ impl<T, U> MinHash<T, U> {
     ///
     /// ```
     /// use probabilistic_collections::similarity::{MinHash, ShingleIterator};
+    /// use probabilistic_collections::SipHasherBuilder;
     ///
-    /// let min_hash = MinHash::new(100);
+    /// let min_hash = MinHash::with_hashers(
+    ///     100,
+    ///     [SipHasherBuilder::from_seed(0, 0), SipHasherBuilder::from_seed(1, 1)],
+    /// );
     ///
     /// assert_eq!(
     ///     min_hash.get_similarity(
     ///         ShingleIterator::new(2, "the cat sat on a mat".split(' ').collect()),
     ///         ShingleIterator::new(2, "the cat sat on the mat".split(' ').collect()),
     ///     ),
-    ///     0.42,
+    ///     0.49,
     /// );
     /// ```
     pub fn get_similarity(&self, iter_1: T, iter_2: T) -> f64
     where
-        T: Iterator<Item = U>,
         U: Hash,
     {
         self.get_similarity_from_hashes(&self.get_min_hashes(iter_1), &self.get_min_hashes(iter_2))
@@ -170,33 +217,46 @@ impl<T, U> MinHash<T, U> {
     /// ```
     /// use probabilistic_collections::similarity::{MinHash, ShingleIterator};
     ///
-    /// let min_hash = MinHash::<ShingleIterator<&str>, &str>::new(100);
+    /// let min_hash = MinHash::<ShingleIterator<str>, _>::new(100);
     /// assert_eq!(min_hash.hasher_count(), 100);
     /// ```
     pub fn hasher_count(&self) -> usize {
         self.hasher_count
+    }
+
+    /// Returns a reference to the `MinHash`'s hasher builders.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::similarity::{MinHash, ShingleIterator};
+    /// use probabilistic_collections::SipHasherBuilder;
+    ///
+    /// let min_hash = MinHash::<ShingleIterator<str>, _>::new(100);
+    /// let hashers = min_hash.hashers();
+    /// ```
+    pub fn hashers(&self) -> &[B; 2] {
+        &self.hasher.hashers()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::MinHash;
+    use crate::similarity::tests::{S1, S2, S3};
     use crate::similarity::ShingleIterator;
+    use crate::util::tests::{HASH_BUILDER_1, HASH_BUILDER_2};
     use std::f64;
-
-    static S1: &str = "the cat sat on a mat";
-    static S2: &str = "the cat sat on the mat";
-    static S3: &str = "we all scream for ice cream";
 
     #[test]
     fn test_min_hash() {
-        let min_hash = MinHash::new(100);
+        let min_hash = MinHash::with_hashers(100, [HASH_BUILDER_1, HASH_BUILDER_2]);
 
         let similarity = min_hash.get_similarity(
             ShingleIterator::new(2, S1.split(' ').collect()),
             ShingleIterator::new(2, S2.split(' ').collect()),
         );
-        assert!(f64::abs(similarity - 0.42) < f64::EPSILON);
+        assert!(f64::abs(similarity - 0.49) < f64::EPSILON);
 
         let similarity = min_hash.get_similarity(
             ShingleIterator::new(2, S1.split(' ').collect()),
@@ -212,7 +272,7 @@ mod tests {
     fn test_ser_de() {
         let min_hash = MinHash::new(100);
         let serialized_min_hash = bincode::serialize(&min_hash).unwrap();
-        let de_min_hash: MinHash<ShingleIterator<str>, Vec<&str>> =
+        let de_min_hash: MinHash<ShingleIterator<str>, _> =
             bincode::deserialize(&serialized_min_hash).unwrap();
 
         let sim = min_hash.get_similarity(

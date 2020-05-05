@@ -1,10 +1,9 @@
 use crate::bit_vec::BitVec;
-use crate::util;
+use crate::{DoubleHasher, SipHasherBuilder};
 #[cfg(feature = "serde")]
 use serde_crate::{Deserialize, Serialize};
-use siphasher::sip::SipHasher;
 use std::borrow::Borrow;
-use std::hash::Hash;
+use std::hash::{BuildHasher, Hash};
 use std::marker::PhantomData;
 
 /// A space-efficient probabilistic data structure to test for membership in a set.
@@ -37,21 +36,18 @@ use std::marker::PhantomData;
     derive(Deserialize, Serialize),
     serde(crate = "serde_crate")
 )]
-pub struct PartitionedBloomFilter<T> {
+pub struct PartitionedBloomFilter<T, B = SipHasherBuilder> {
     bit_vec: BitVec,
-    hashers: [SipHasher; 2],
+    hasher: DoubleHasher<T, B>,
     bit_count: usize,
     hasher_count: usize,
     _marker: PhantomData<T>,
 }
 
 impl<T> PartitionedBloomFilter<T> {
-    fn get_hasher_count(fpp: f64) -> usize {
-        (1.0 / fpp).log2().ceil() as usize
-    }
-
     /// Constructs a new, empty `PartitionedBloomFilter` with an estimated max capacity of
-    /// `item_count` items and a maximum false positive probability of `fpp`.
+    /// `item_count` items, and a maximum false positive probability of `fpp`.
+    ///
     ///
     /// # Examples
     ///
@@ -61,19 +57,17 @@ impl<T> PartitionedBloomFilter<T> {
     /// let filter = PartitionedBloomFilter::<String>::from_item_count(10, 0.01);
     /// ```
     pub fn from_item_count(item_count: usize, fpp: f64) -> Self {
-        let hasher_count = Self::get_hasher_count(fpp);
-        let bit_count = (item_count as f64 * fpp.ln() / -2f64.ln().powi(2) / (hasher_count as f64))
-            .ceil() as usize;
-        PartitionedBloomFilter {
-            bit_vec: BitVec::new(bit_count * hasher_count),
-            hashers: util::get_hashers(),
-            bit_count,
-            hasher_count,
-            _marker: PhantomData,
-        }
+        Self::from_item_count_with_hashers(
+            item_count,
+            fpp,
+            [
+                SipHasherBuilder::from_entropy(),
+                SipHasherBuilder::from_entropy(),
+            ],
+        )
     }
 
-    /// Constructs a new, empty `PartitionedBloomFilter` with `bit_count` bits per partition and a
+    /// Constructs a new, empty `PartitionedBloomFilter` with `bit_count` bits per partition, and a
     /// maximum false positive probability of `fpp`.
     ///
     /// # Examples
@@ -84,10 +78,78 @@ impl<T> PartitionedBloomFilter<T> {
     /// let filter = PartitionedBloomFilter::<String>::from_bit_count(10, 0.01);
     /// ```
     pub fn from_bit_count(bit_count: usize, fpp: f64) -> Self {
+        Self::from_bit_count_with_hashers(
+            bit_count,
+            fpp,
+            [
+                SipHasherBuilder::from_entropy(),
+                SipHasherBuilder::from_entropy(),
+            ],
+        )
+    }
+}
+
+impl<T, B> PartitionedBloomFilter<T, B>
+where
+    B: BuildHasher,
+{
+    fn get_hasher_count(fpp: f64) -> usize {
+        (1.0 / fpp).log2().ceil() as usize
+    }
+
+    /// Constructs a new, empty `PartitionedBloomFilter` with an estimated max capacity of
+    /// `item_count` items, a maximum false positive probability of `fpp`, and two hash builders
+    /// for double hashing.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::bloom::PartitionedBloomFilter;
+    /// use probabilistic_collections::SipHasherBuilder;
+    ///
+    /// let filter = PartitionedBloomFilter::<String>::from_item_count_with_hashers(
+    ///     10,
+    ///     0.01,
+    ///     [SipHasherBuilder::from_seed(0, 0), SipHasherBuilder::from_seed(1, 1)],
+    /// );
+    /// ```
+    pub fn from_item_count_with_hashers(
+        item_count: usize,
+        fpp: f64,
+        hash_builders: [B; 2],
+    ) -> Self {
+        let hasher_count = Self::get_hasher_count(fpp);
+        let bit_count = (item_count as f64 * fpp.ln() / -2f64.ln().powi(2) / (hasher_count as f64))
+            .ceil() as usize;
+        PartitionedBloomFilter {
+            bit_vec: BitVec::new(bit_count * hasher_count),
+            hasher: DoubleHasher::with_hashers(hash_builders),
+            bit_count,
+            hasher_count,
+            _marker: PhantomData,
+        }
+    }
+
+    /// Constructs a new, empty `PartitionedBloomFilter` with `bit_count` bits per partition, a
+    /// maximum false positive probability of `fpp`, and two hash builders for double hashing.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::bloom::PartitionedBloomFilter;
+    /// use probabilistic_collections::SipHasherBuilder;
+    ///
+    /// let filter = PartitionedBloomFilter::<String>::from_bit_count_with_hashers(
+    ///     10,
+    ///     0.01,
+    ///     [SipHasherBuilder::from_seed(0, 0), SipHasherBuilder::from_seed(1, 1)],
+    /// );
+    /// ```
+    pub fn from_bit_count_with_hashers(bit_count: usize, fpp: f64, hash_builders: [B; 2]) -> Self {
         let hasher_count = Self::get_hasher_count(fpp);
         PartitionedBloomFilter {
             bit_vec: BitVec::new(bit_count * hasher_count),
-            hashers: util::get_hashers(),
+            hasher: DoubleHasher::with_hashers(hash_builders),
             bit_count,
             hasher_count,
             _marker: PhantomData,
@@ -110,14 +172,14 @@ impl<T> PartitionedBloomFilter<T> {
         T: Borrow<U>,
         U: Hash + ?Sized,
     {
-        let hashes = util::get_hashes::<T, U>(&self.hashers, item);
-        for index in 0..self.hasher_count {
-            let mut offset = (index as u64).wrapping_mul(hashes[1]) % 0xFFFF_FFFF_FFFF_FFC5;
-            offset = hashes[0].wrapping_add(offset);
-            offset %= self.bit_count as u64;
-            offset += (index * self.bit_count) as u64;
-            self.bit_vec.set(offset as usize, true);
-        }
+        self.hasher
+            .hash(item)
+            .take(self.hasher_count)
+            .enumerate()
+            .for_each(|(index, hash)| {
+                let offset = (hash % self.bit_count as u64) + (index * self.bit_count) as u64;
+                self.bit_vec.set(offset as usize, true);
+            })
     }
 
     /// Checks if an element is possibly in the bloom filter.
@@ -138,14 +200,14 @@ impl<T> PartitionedBloomFilter<T> {
         T: Borrow<U>,
         U: Hash + ?Sized,
     {
-        let hashes = util::get_hashes::<T, U>(&self.hashers, item);
-        (0..self.hasher_count).all(|index| {
-            let mut offset = (index as u64).wrapping_mul(hashes[1]) % 0xFFFF_FFFF_FFFF_FFC5;
-            offset = hashes[0].wrapping_add(offset);
-            offset %= self.bit_count as u64;
-            offset += (index * self.bit_count) as u64;
-            self.bit_vec[offset as usize]
-        })
+        self.hasher
+            .hash(item)
+            .take(self.hasher_count)
+            .enumerate()
+            .all(|(index, hash)| {
+                let offset = (hash % self.bit_count as u64) + (index * self.bit_count) as u64;
+                self.bit_vec[offset as usize]
+            })
     }
 
     /// Returns the number of bits in the bloom filter.
@@ -280,15 +342,34 @@ impl<T> PartitionedBloomFilter<T> {
         let single_fpp = self.bit_vec.count_ones() as f64 / self.bit_vec.len() as f64;
         single_fpp.powi(self.hasher_count as i32)
     }
+
+    /// Returns a reference to the bloom filter's hasher builders.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::bloom::PartitionedBloomFilter;
+    ///
+    /// let filter = PartitionedBloomFilter::<String>::from_item_count(100, 0.01);
+    /// let hashers = filter.hashers();
+    /// ```
+    pub fn hashers(&self) -> &[B; 2] {
+        return &self.hasher.hashers();
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::PartitionedBloomFilter;
+    use crate::util::tests::{HASH_BUILDER_1, HASH_BUILDER_2};
 
     #[test]
     fn test_from_item_count() {
-        let mut filter = PartitionedBloomFilter::<String>::from_item_count(10, 0.01);
+        let mut filter = PartitionedBloomFilter::<String>::from_item_count_with_hashers(
+            10,
+            0.01,
+            [HASH_BUILDER_1, HASH_BUILDER_2],
+        );
 
         assert!(!filter.contains("foo"));
         filter.insert("foo");
@@ -306,7 +387,11 @@ mod tests {
 
     #[test]
     fn test_from_bit_count() {
-        let mut filter = PartitionedBloomFilter::<String>::from_bit_count(10, 0.01);
+        let mut filter = PartitionedBloomFilter::<String>::from_bit_count_with_hashers(
+            10,
+            0.01,
+            [HASH_BUILDER_1, HASH_BUILDER_2],
+        );
 
         assert!(!filter.contains("foo"));
         filter.insert("foo");
@@ -324,7 +409,11 @@ mod tests {
 
     #[test]
     fn test_estimated_fpp() {
-        let mut filter = PartitionedBloomFilter::<String>::from_item_count(100, 0.01);
+        let mut filter = PartitionedBloomFilter::<String>::from_item_count_with_hashers(
+            100,
+            0.01,
+            [HASH_BUILDER_1, HASH_BUILDER_2],
+        );
         assert!(filter.estimated_fpp() < std::f64::EPSILON);
 
         filter.insert("foo");
@@ -346,11 +435,6 @@ mod tests {
         assert!(de_filter.contains("foo"));
         assert_eq!(filter.bit_vec, de_filter.bit_vec);
         assert_eq!(filter.bit_count, de_filter.bit_count);
-        // SipHasher doesn't implement PartialEq, but it does implement Debug,
-        // and its Debug impl does print all internal state.
-        assert_eq!(
-            format!("{:?}", filter.hashers),
-            format!("{:?}", de_filter.hashers)
-        );
+        assert_eq!(filter.hasher, filter.hasher);
     }
 }

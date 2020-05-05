@@ -1,10 +1,9 @@
-use rand::{Rng, XorShiftRng};
+use crate::SipHasherBuilder;
 #[cfg(feature = "serde")]
 use serde_crate::{Deserialize, Serialize};
-use siphasher::sip::SipHasher;
 use std::cmp;
 use std::collections::HashSet;
-use std::hash::{Hash, Hasher};
+use std::hash::{BuildHasher, Hash, Hasher};
 use std::iter::FromIterator;
 use std::marker::PhantomData;
 
@@ -16,22 +15,23 @@ use std::marker::PhantomData;
 ///
 /// ```
 /// use probabilistic_collections::similarity::{ShingleIterator, SimHash};
+/// use probabilistic_collections::SipHasherBuilder;
 ///
-/// let sim_hash = SimHash::new();
+/// let sim_hash = SimHash::with_hasher(SipHasherBuilder::from_seed(0, 0));
 ///
 /// assert_eq!(
 ///     sim_hash.get_sim_hash(ShingleIterator::new(
 ///         2,
 ///         "the cat sat on a mat".split(' ').collect()
 ///     )),
-///     0b1111011011001001011100000010010110011011101011110110000010001001,
+///     0b1000_0101_1011_1000_0010_1111_1011_0000_1110_1000_0011_1011_0110_0100_0000_0100,
 /// );
 /// assert_eq!(
 ///     sim_hash.get_sim_hash(ShingleIterator::new(
 ///         2,
 ///         "the cat sat on the mat".split(' ').collect()
 ///     )),
-///     0b0111011001000001011110000011011010011011101001100101101000000001,
+///     0b0000_0101_0011_1000_0001_1111_1111_1000_0111_1011_0011_0001_1010_0001_0000_0110,
 /// );
 /// ```
 #[cfg_attr(
@@ -39,36 +39,61 @@ use std::marker::PhantomData;
     derive(Deserialize, Serialize),
     serde(crate = "serde_crate")
 )]
-pub struct SimHash<T, U> {
-    hasher: SipHasher,
+pub struct SimHash<T, U, B = SipHasherBuilder> {
+    hash_builder: B,
     _marker: PhantomData<(T, U)>,
 }
 
-impl<T, U> SimHash<T, U> {
-    /// Constructs a new `SimHash`,
+impl<T, U> SimHash<T, U>
+where
+    T: Iterator<Item = U>,
+{
+    /// Constructs a new `SimHash`.
     ///
     /// # Examples
     ///
     /// ```
     /// use probabilistic_collections::similarity::{ShingleIterator, SimHash};
     ///
-    /// let sim_hash = SimHash::<ShingleIterator<&str>, &str>::new();
+    /// let sim_hash = SimHash::<ShingleIterator<str>, _>::new();
     /// ```
     pub fn new() -> Self {
-        let mut rng = XorShiftRng::new_unseeded();
-        SimHash {
-            hasher: SipHasher::new_with_keys(rng.next_u64(), rng.next_u64()),
-            _marker: PhantomData,
-        }
+        Self::with_hasher(SipHasherBuilder::from_entropy())
     }
+}
 
+impl<T, U, B> SimHash<T, U, B>
+where
+    T: Iterator<Item = U>,
+    B: BuildHasher,
+{
     fn get_hash(&self, item: &U) -> u64
     where
         U: Hash,
+        B: BuildHasher,
     {
-        let mut sip = self.hasher;
-        item.hash(&mut sip);
-        sip.finish()
+        let mut hasher = self.hash_builder.build_hasher();
+        item.hash(&mut hasher);
+        hasher.finish()
+    }
+
+    /// Constructs a new `SimHash` with a specified hasher builder.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::similarity::{ShingleIterator, SimHash};
+    /// use probabilistic_collections::SipHasherBuilder;
+    ///
+    /// let sim_hash = SimHash::<ShingleIterator<str>, _>::with_hasher(
+    ///     SipHasherBuilder::from_entropy(),
+    /// );
+    /// ```
+    pub fn with_hasher(hash_builder: B) -> Self {
+        SimHash {
+            hash_builder,
+            _marker: PhantomData,
+        }
     }
 
     /// Returns the hash associated with iterator `iter`.
@@ -77,20 +102,20 @@ impl<T, U> SimHash<T, U> {
     ///
     /// ```
     /// use probabilistic_collections::similarity::{ShingleIterator, SimHash};
+    /// use probabilistic_collections::SipHasherBuilder;
     ///
-    /// let sim_hash = SimHash::new();
+    /// let sim_hash = SimHash::with_hasher(SipHasherBuilder::from_seed(0, 0));
     ///
     /// assert_eq!(
     ///     sim_hash.get_sim_hash(ShingleIterator::new(
     ///         2,
     ///         "the cat sat on a mat".split(' ').collect()
     ///     )),
-    ///     0b1111011011001001011100000010010110011011101011110110000010001001,
+    ///     0b1000_0101_1011_1000_0010_1111_1011_0000_1110_1000_0011_1011_0110_0100_0000_0100,
     /// );
     /// ```
     pub fn get_sim_hash(&self, iter: T) -> u64
     where
-        T: Iterator<Item = U>,
         U: Hash,
     {
         let mut counts = [0i64; 64];
@@ -120,8 +145,9 @@ impl<T, U> SimHash<T, U> {
     ///
     /// ```
     /// use probabilistic_collections::similarity::{ShingleIterator, SimHash};
+    /// use probabilistic_collections::SipHasherBuilder;
     ///
-    /// let sim_hash = SimHash::new();
+    /// let sim_hash = SimHash::with_hasher(SipHasherBuilder::from_seed(0, 0));
     ///
     /// sim_hash.report_similarities(
     ///     2,
@@ -134,7 +160,6 @@ impl<T, U> SimHash<T, U> {
     /// ```
     pub fn report_similarities(&self, window_size: usize, iter_vec: Vec<T>) -> Vec<(usize, usize)>
     where
-        T: Iterator<Item = U>,
         U: Hash,
     {
         assert!(window_size > 1);
@@ -166,9 +191,26 @@ impl<T, U> SimHash<T, U> {
 
         Vec::from_iter(similarities.into_iter())
     }
+
+    /// Returns a reference to the `SimHash`'s hasher builder.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::similarity::{ShingleIterator, SimHash};
+    ///
+    /// let sim_hash = SimHash::<ShingleIterator<str>, _>::new();
+    /// let hasher = sim_hash.hasher();
+    /// ```
+    pub fn hasher(&self) -> &B {
+        &self.hash_builder
+    }
 }
 
-impl<T, U> Default for SimHash<T, U> {
+impl<T, U> Default for SimHash<T, U>
+where
+    T: Iterator<Item = U>,
+{
     fn default() -> SimHash<T, U> {
         SimHash::new()
     }
@@ -177,27 +219,25 @@ impl<T, U> Default for SimHash<T, U> {
 #[cfg(test)]
 mod tests {
     use super::SimHash;
+    use crate::similarity::tests::{S1, S2, S3};
     use crate::similarity::ShingleIterator;
-
-    static S1: &str = "the cat sat on a mat";
-    static S2: &str = "the cat sat on the mat";
-    static S3: &str = "we all scream for ice cream";
+    use crate::util::tests::HASH_BUILDER_1;
 
     #[test]
     fn test_sim_hash() {
-        let sim_hash = SimHash::new();
+        let sim_hash = SimHash::with_hasher(HASH_BUILDER_1);
 
         assert_eq!(
             sim_hash.get_sim_hash(ShingleIterator::new(2, S1.split(' ').collect())),
-            0b1111_0110_1100_1001_0111_0000_0010_0101_1001_1011_1010_1111_0110_0000_1000_1001,
+            0b1000_0101_1011_1000_0010_1111_1011_0000_1110_1000_0011_1011_0110_0100_0000_0100,
         );
         assert_eq!(
             sim_hash.get_sim_hash(ShingleIterator::new(2, S2.split(' ').collect())),
-            0b0111_0110_0100_0001_0111_1000_0011_0110_1001_1011_1010_0110_0101_1010_0000_0001,
+            0b0000_0101_0011_1000_0001_1111_1111_1000_0111_1011_0011_0001_1010_0001_0000_0110,
         );
         assert_eq!(
             sim_hash.get_sim_hash(ShingleIterator::new(2, S3.split(' ').collect())),
-            0b0011_1001_0110_0111_1010_1011_1000_1101_0110_0011_1001_0010_0001_1010_0000_0000,
+            0b1001_0011_1010_1010_1100_1011_0000_0000_0010_1100_0010_0001_0101_1000_0111_1101,
         );
 
         let similarities = sim_hash.report_similarities(
@@ -218,7 +258,7 @@ mod tests {
     fn test_ser_de() {
         let sim_hash = SimHash::new();
         let serialized_sim_hash = bincode::serialize(&sim_hash).unwrap();
-        let de_sim_hash: SimHash<ShingleIterator<str>, Vec<&str>> =
+        let de_sim_hash: SimHash<ShingleIterator<str>, _> =
             bincode::deserialize(&serialized_sim_hash).unwrap();
 
         assert_eq!(

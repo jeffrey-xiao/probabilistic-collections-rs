@@ -1,13 +1,12 @@
 use crate::bit_array_vec::BitArrayVec;
 use crate::cuckoo::{DEFAULT_ENTRIES_PER_INDEX, DEFAULT_FINGERPRINT_BIT_COUNT, DEFAULT_MAX_KICKS};
-use crate::util;
+use crate::SipHasherBuilder;
 use rand::{Rng, XorShiftRng};
 #[cfg(feature = "serde")]
 use serde_crate::{Deserialize, Serialize};
-use siphasher::sip::SipHasher;
 use std::borrow::Borrow;
 use std::cmp;
-use std::hash::{Hash, Hasher};
+use std::hash::{BuildHasher, Hash, Hasher};
 use std::marker::PhantomData;
 
 /// A space-efficient probabilistic data structure to test for membership in a set. Cuckoo filters
@@ -42,12 +41,12 @@ use std::marker::PhantomData;
     derive(Deserialize, Serialize),
     serde(crate = "serde_crate")
 )]
-pub struct CuckooFilter<T> {
+pub struct CuckooFilter<T, B = SipHasherBuilder> {
     max_kicks: usize,
     entries_per_index: usize,
     fingerprint_vec: BitArrayVec,
     pub(super) extra_items: Vec<(u64, usize)>,
-    hashers: [SipHasher; 2],
+    hash_builders: [B; 2],
     #[cfg_attr(feature = "serde", serde(skip, default = "XorShiftRng::new_unseeded"))]
     rng: XorShiftRng,
     _marker: PhantomData<T>,
@@ -73,21 +72,13 @@ impl<T> CuckooFilter<T> {
     /// let filter = CuckooFilter::<String>::new(100);
     /// ```
     pub fn new(item_count: usize) -> Self {
-        assert!(item_count > 0);
-        let bucket_len = ((item_count + DEFAULT_ENTRIES_PER_INDEX - 1) / DEFAULT_ENTRIES_PER_INDEX)
-            .next_power_of_two();
-        CuckooFilter {
-            max_kicks: DEFAULT_MAX_KICKS,
-            entries_per_index: DEFAULT_ENTRIES_PER_INDEX,
-            fingerprint_vec: BitArrayVec::new(
-                DEFAULT_FINGERPRINT_BIT_COUNT,
-                bucket_len * DEFAULT_ENTRIES_PER_INDEX,
-            ),
-            extra_items: Vec::new(),
-            hashers: util::get_hashers(),
-            rng: XorShiftRng::new_unseeded(),
-            _marker: PhantomData,
-        }
+        Self::with_hashers(
+            item_count,
+            [
+                SipHasherBuilder::from_entropy(),
+                SipHasherBuilder::from_entropy(),
+            ],
+        )
     }
 
     /// Constructs a new, empty `CuckooFilter` with an estimated max capacity of `item_count`, a
@@ -114,26 +105,15 @@ impl<T> CuckooFilter<T> {
         fingerprint_bit_count: usize,
         entries_per_index: usize,
     ) -> Self {
-        assert!(
-            item_count > 0
-                && fingerprint_bit_count > 1
-                && fingerprint_bit_count <= 64
-                && entries_per_index > 0
-        );
-        let exact_bucket_len = (item_count + entries_per_index - 1) / entries_per_index;
-        let bucket_len = exact_bucket_len.next_power_of_two();
-        CuckooFilter {
-            max_kicks: DEFAULT_MAX_KICKS,
+        Self::from_parameters_with_hashers(
+            item_count,
+            fingerprint_bit_count,
             entries_per_index,
-            fingerprint_vec: BitArrayVec::new(
-                fingerprint_bit_count,
-                bucket_len * entries_per_index,
-            ),
-            extra_items: Vec::new(),
-            hashers: util::get_hashers(),
-            rng: XorShiftRng::new_unseeded(),
-            _marker: PhantomData,
-        }
+            [
+                SipHasherBuilder::from_entropy(),
+                SipHasherBuilder::from_entropy(),
+            ],
+        )
     }
 
     /// Constructs a new, empty `CuckooFilter` with an estimated max capacity of `item_count`, an
@@ -154,24 +134,15 @@ impl<T> CuckooFilter<T> {
     /// let filter = CuckooFilter::<String>::from_entries_per_index(100, 0.01, 4);
     /// ```
     pub fn from_entries_per_index(item_count: usize, fpp: f64, entries_per_index: usize) -> Self {
-        assert!(item_count > 0);
-        assert!(entries_per_index > 0);
-        let power = 2.0 / (1.0 - (1.0 - fpp).powf(1.0 / (2.0 * entries_per_index as f64)));
-        let fingerprint_bit_count = power.log2().ceil() as usize;
-        let exact_bucket_len = (item_count + entries_per_index - 1) / entries_per_index;
-        let bucket_len = exact_bucket_len.next_power_of_two();
-        CuckooFilter {
-            max_kicks: DEFAULT_MAX_KICKS,
+        Self::from_entries_per_index_with_hashers(
+            item_count,
+            fpp,
             entries_per_index,
-            fingerprint_vec: BitArrayVec::new(
-                fingerprint_bit_count,
-                bucket_len * entries_per_index,
-            ),
-            extra_items: Vec::new(),
-            hashers: util::get_hashers(),
-            rng: XorShiftRng::new_unseeded(),
-            _marker: PhantomData,
-        }
+            [
+                SipHasherBuilder::from_entropy(),
+                SipHasherBuilder::from_entropy(),
+            ],
+        )
     }
 
     /// Constructs a new, empty `CuckooFilter` with an estimated max capacity of `item_count`, an
@@ -198,6 +169,199 @@ impl<T> CuckooFilter<T> {
         fpp: f64,
         fingerprint_bit_count: usize,
     ) -> Self {
+        Self::from_fingerprint_bit_count_with_hashers(
+            item_count,
+            fpp,
+            fingerprint_bit_count,
+            [
+                SipHasherBuilder::from_entropy(),
+                SipHasherBuilder::from_entropy(),
+            ],
+        )
+    }
+}
+
+impl<T, B> CuckooFilter<T, B>
+where
+    B: BuildHasher,
+{
+    /// Constructs a new, empty `CuckooFilter` with an estimated max capacity of `item_count`, and
+    /// two hasher builders for double hashing. By default, the cuckoo filter will have 8 bits per
+    /// item fingerprint, 4 entries per index, and a maximum of 512 item displacements before
+    /// terminating the insertion process. The cuckoo filter will have an estimated maximum false
+    /// positive probability of 3%.
+    ///
+    /// The length of each bucket will be rounded off to the next power of two.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `item_count` is 0.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::cuckoo::CuckooFilter;
+    /// use probabilistic_collections::SipHasherBuilder;
+    ///
+    /// let filter = CuckooFilter::<String>::with_hashers(
+    ///     100,
+    ///     [SipHasherBuilder::from_seed(0, 0), SipHasherBuilder::from_seed(1, 1)],
+    /// );
+    /// ```
+    pub fn with_hashers(item_count: usize, hash_builders: [B; 2]) -> Self {
+        assert!(item_count > 0);
+        let bucket_len = ((item_count + DEFAULT_ENTRIES_PER_INDEX - 1) / DEFAULT_ENTRIES_PER_INDEX)
+            .next_power_of_two();
+        CuckooFilter {
+            max_kicks: DEFAULT_MAX_KICKS,
+            entries_per_index: DEFAULT_ENTRIES_PER_INDEX,
+            fingerprint_vec: BitArrayVec::new(
+                DEFAULT_FINGERPRINT_BIT_COUNT,
+                bucket_len * DEFAULT_ENTRIES_PER_INDEX,
+            ),
+            extra_items: Vec::new(),
+            hash_builders,
+            rng: XorShiftRng::new_unseeded(),
+            _marker: PhantomData,
+        }
+    }
+
+    /// Constructs a new, empty `CuckooFilter` with an estimated max capacity of `item_count`, a
+    /// fingerprint bit count of `fingerprint_bit_count`, `entries_per_index` entries per index, a
+    /// maximum of 512 item displacements before terminating the insertion process, and two hasher
+    /// builders for double hashing. This method provides no guarantees on the false positive
+    /// probability of the cuckoo filter.
+    ///
+    /// The length of each bucket will be rounded off to the next power of two.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `item_count` is 0, if `fingerprint_bit_count` less than 1 or greater than 64, or
+    /// if `entries_per_index` is 0.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::cuckoo::CuckooFilter;
+    /// use probabilistic_collections::SipHasherBuilder;
+    ///
+    /// let filter = CuckooFilter::<String>::from_parameters_with_hashers(
+    ///     100,
+    ///     16,
+    ///     8,
+    ///     [SipHasherBuilder::from_seed(0, 0), SipHasherBuilder::from_seed(1, 1)],
+    /// );
+    /// ```
+    pub fn from_parameters_with_hashers(
+        item_count: usize,
+        fingerprint_bit_count: usize,
+        entries_per_index: usize,
+        hash_builders: [B; 2],
+    ) -> Self {
+        assert!(
+            item_count > 0
+                && fingerprint_bit_count > 1
+                && fingerprint_bit_count <= 64
+                && entries_per_index > 0
+        );
+        let exact_bucket_len = (item_count + entries_per_index - 1) / entries_per_index;
+        let bucket_len = exact_bucket_len.next_power_of_two();
+        CuckooFilter {
+            max_kicks: DEFAULT_MAX_KICKS,
+            entries_per_index,
+            fingerprint_vec: BitArrayVec::new(
+                fingerprint_bit_count,
+                bucket_len * entries_per_index,
+            ),
+            extra_items: Vec::new(),
+            hash_builders,
+            rng: XorShiftRng::new_unseeded(),
+            _marker: PhantomData,
+        }
+    }
+
+    /// Constructs a new, empty `CuckooFilter` with an estimated max capacity of `item_count`, an
+    /// estimated maximum false positive probability of `fpp`, `entries_per_index` entries per
+    /// index, a maximum of 512 item displacements before terminating the insertion process, and
+    /// two hasher builders for doubling hashing.
+    ///
+    /// The length of each bucket will be rounded off to the next power of two.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `item_count` is 0 or if `entries_per_index` is 0.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::cuckoo::CuckooFilter;
+    /// use probabilistic_collections::SipHasherBuilder;
+    ///
+    /// let filter = CuckooFilter::<String>::from_entries_per_index_with_hashers(
+    ///     100,
+    ///     0.01,
+    ///     4,
+    ///     [SipHasherBuilder::from_seed(0, 0), SipHasherBuilder::from_seed(1, 1)],
+    /// );
+    /// ```
+    pub fn from_entries_per_index_with_hashers(
+        item_count: usize,
+        fpp: f64,
+        entries_per_index: usize,
+        hash_builders: [B; 2],
+    ) -> Self {
+        assert!(item_count > 0);
+        assert!(entries_per_index > 0);
+        let power = 2.0 / (1.0 - (1.0 - fpp).powf(1.0 / (2.0 * entries_per_index as f64)));
+        let fingerprint_bit_count = power.log2().ceil() as usize;
+        let exact_bucket_len = (item_count + entries_per_index - 1) / entries_per_index;
+        let bucket_len = exact_bucket_len.next_power_of_two();
+        let ret = CuckooFilter {
+            max_kicks: DEFAULT_MAX_KICKS,
+            entries_per_index,
+            fingerprint_vec: BitArrayVec::new(
+                fingerprint_bit_count,
+                bucket_len * entries_per_index,
+            ),
+            extra_items: Vec::new(),
+            hash_builders,
+            rng: XorShiftRng::new_unseeded(),
+            _marker: PhantomData,
+        };
+        ret
+    }
+
+    /// Constructs a new, empty `CuckooFilter` with an estimated max capacity of `item_count`, an
+    /// estimated maximum false positive probability of `fpp`, a fingerprint bit count of
+    /// `fingerprint_bit_count`, a maximum of 512 item displacements before terminating the
+    /// insertion process, and two hasher builders for double hashing.
+    ///
+    /// The length of each bucket will be rounded off to the next power of two.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `item_count` is 0, if `fingerprint_bit_count` is less than 1 or greater than 64,
+    /// or if it is impossible to achieve the given maximum false positive probability.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::cuckoo::CuckooFilter;
+    /// use probabilistic_collections::SipHasherBuilder;
+    ///
+    /// let filter = CuckooFilter::<String>::from_fingerprint_bit_count_with_hashers(
+    ///     100,
+    ///     0.01,
+    ///     10,
+    ///     [SipHasherBuilder::from_seed(0, 0), SipHasherBuilder::from_seed(1, 1)],
+    /// );
+    /// ```
+    pub fn from_fingerprint_bit_count_with_hashers(
+        item_count: usize,
+        fpp: f64,
+        fingerprint_bit_count: usize,
+        hash_builders: [B; 2],
+    ) -> Self {
         assert!(item_count > 0);
         assert!(fingerprint_bit_count > 1 && fingerprint_bit_count <= 64);
         let fingerprints_count = 2.0f64.powi(fingerprint_bit_count as i32);
@@ -214,7 +378,7 @@ impl<T> CuckooFilter<T> {
                 bucket_len * entries_per_index,
             ),
             extra_items: Vec::new(),
-            hashers: util::get_hashers(),
+            hash_builders,
             rng: XorShiftRng::new_unseeded(),
             _marker: PhantomData,
         }
@@ -239,21 +403,31 @@ impl<T> CuckooFilter<T> {
         index * self.entries_per_index + bucket_index
     }
 
-    fn get_fingerprint_and_indexes(&self, mut hashes: [u64; 2]) -> (Vec<u8>, usize, usize) {
+    fn get_fingerprint_and_indexes<U>(&self, item: &U) -> (Vec<u8>, usize, usize)
+    where
+        T: Borrow<U>,
+        U: Hash + ?Sized,
+    {
         let trailing_zeros = 64 - self.fingerprint_bit_count();
-        let mut raw_fingerprint = hashes[0] << trailing_zeros >> trailing_zeros;
-        let mut fingerprint = Self::get_fingerprint(raw_fingerprint);
+        let mut hasher = self.hash_builders[0].build_hasher();
+        item.hash(&mut hasher);
+        let mut h0 = hasher.finish();
+        let mut raw_fingerprint = h0 << trailing_zeros >> trailing_zeros;
 
         // rehash when fingerprint is all 0s
         while raw_fingerprint == 0 {
-            let mut sip = self.hashers[0];
-            hashes[0].hash(&mut sip);
-            hashes[0] = sip.finish();
-            raw_fingerprint = hashes[0] << trailing_zeros >> trailing_zeros;
-            fingerprint = Self::get_fingerprint(raw_fingerprint);
+            let mut hasher = self.hash_builders[0].build_hasher();
+            h0.hash(&mut hasher);
+            h0 = hasher.finish();
+            raw_fingerprint = h0 << trailing_zeros >> trailing_zeros;
         }
+        let fingerprint = Self::get_fingerprint(raw_fingerprint);
 
-        let index_1 = hashes[1] as usize % self.bucket_len();
+        let mut hasher = self.hash_builders[1].build_hasher();
+        item.hash(&mut hasher);
+        let h1 = hasher.finish();
+
+        let index_1 = h1 as usize % self.bucket_len();
         let index_2 = (index_1 ^ raw_fingerprint as usize) % self.bucket_len();
         (fingerprint, index_1, index_2)
     }
@@ -273,8 +447,7 @@ impl<T> CuckooFilter<T> {
         T: Borrow<U>,
         U: Hash + ?Sized,
     {
-        let hashes = util::get_hashes::<T, U>(&self.hashers, item);
-        let (mut fingerprint, index_1, index_2) = self.get_fingerprint_and_indexes(hashes);
+        let (mut fingerprint, index_1, index_2) = self.get_fingerprint_and_indexes(item);
         if !self.contains_fingerprint(&fingerprint, index_1, index_2) {
             if self.insert_fingerprint(fingerprint.as_slice(), index_1) {
                 return;
@@ -285,7 +458,11 @@ impl<T> CuckooFilter<T> {
             }
 
             // have to kick out an entry
-            let mut index = if self.rng.gen::<bool>() { index_1 } else { index_2 };
+            let mut index = if self.rng.gen::<bool>() {
+                index_1
+            } else {
+                index_2
+            };
             let mut prev_index = index;
 
             for _ in 0..self.max_kicks {
@@ -347,8 +524,7 @@ impl<T> CuckooFilter<T> {
         T: Borrow<U>,
         U: Hash + ?Sized,
     {
-        let hashes = util::get_hashes::<T, U>(&self.hashers, item);
-        let (fingerprint, index_1, index_2) = self.get_fingerprint_and_indexes(hashes);
+        let (fingerprint, index_1, index_2) = self.get_fingerprint_and_indexes(item);
         self.remove_fingerprint(&fingerprint, index_1, index_2)
     }
 
@@ -398,8 +574,7 @@ impl<T> CuckooFilter<T> {
         T: Borrow<U>,
         U: Hash + ?Sized,
     {
-        let hashes = util::get_hashes::<T, U>(&self.hashers, item);
-        let (fingerprint, index_1, index_2) = self.get_fingerprint_and_indexes(hashes);
+        let (fingerprint, index_1, index_2) = self.get_fingerprint_and_indexes(item);
         self.contains_fingerprint(&fingerprint, index_1, index_2)
     }
 
@@ -446,8 +621,8 @@ impl<T> CuckooFilter<T> {
         self.extra_items.clear();
     }
 
-    /// Returns the number of occupied entries in the cuckoo filter. It does not account for items
-    /// in the extra items vector.
+    /// Returns the number of occupied entries in the cuckoo filter. It does account for items in
+    /// the extra items vector.
     ///
     /// # Examples
     ///
@@ -594,6 +769,20 @@ impl<T> CuckooFilter<T> {
         let occupied_ratio = occupied_len as f64 / self.capacity() as f64;
         1.0 - single_fpp.powf(2.0 * self.entries_per_index() as f64 * occupied_ratio)
     }
+
+    /// Returns a reference to the cuckoo filter's hasher builders.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::cuckoo::CuckooFilter;
+    ///
+    /// let filter = CuckooFilter::<String>::new(100);
+    /// let hashers = filter.hashers();
+    /// ```
+    pub fn hashers(&self) -> &[B; 2] {
+        return &self.hash_builders;
+    }
 }
 
 impl<T> PartialEq for CuckooFilter<T> {
@@ -602,14 +791,14 @@ impl<T> PartialEq for CuckooFilter<T> {
             && self.entries_per_index == other.entries_per_index
             && self.fingerprint_vec == other.fingerprint_vec
             && self.extra_items == other.extra_items
-            && self.hashers[0].keys() == other.hashers[0].keys()
-            && self.hashers[1].keys() == other.hashers[1].keys()
+            && self.hash_builders == other.hash_builders
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::CuckooFilter;
+    use crate::util::tests::{HASH_BUILDER_1, HASH_BUILDER_2};
 
     #[test]
     fn test_get_fingerprint() {
@@ -631,7 +820,7 @@ mod tests {
 
     #[test]
     fn test_new() {
-        let filter = CuckooFilter::<String>::new(100);
+        let filter = CuckooFilter::<String>::with_hashers(100, [HASH_BUILDER_1, HASH_BUILDER_2]);
         assert_eq!(filter.len(), 0);
         assert!(filter.is_empty());
         assert_eq!(filter.capacity(), 128);
@@ -642,7 +831,12 @@ mod tests {
 
     #[test]
     fn test_from_parameters() {
-        let filter = CuckooFilter::<String>::from_parameters(100, 16, 8);
+        let filter = CuckooFilter::<String>::from_parameters_with_hashers(
+            100,
+            16,
+            8,
+            [HASH_BUILDER_1, HASH_BUILDER_2],
+        );
         assert_eq!(filter.len(), 0);
         assert!(filter.is_empty());
         assert_eq!(filter.capacity(), 128);
@@ -653,7 +847,12 @@ mod tests {
 
     #[test]
     fn test_from_entries_per_index() {
-        let filter = CuckooFilter::<String>::from_entries_per_index(100, 0.01, 4);
+        let filter = CuckooFilter::<String>::from_entries_per_index_with_hashers(
+            100,
+            0.01,
+            4,
+            [HASH_BUILDER_1, HASH_BUILDER_2],
+        );
         assert_eq!(filter.len(), 0);
         assert!(filter.is_empty());
         assert_eq!(filter.capacity(), 128);
@@ -664,7 +863,12 @@ mod tests {
 
     #[test]
     fn test_from_fingerprint_bit_count() {
-        let filter = CuckooFilter::<String>::from_fingerprint_bit_count(100, 0.01, 10);
+        let filter = CuckooFilter::<String>::from_fingerprint_bit_count_with_hashers(
+            100,
+            0.01,
+            10,
+            [HASH_BUILDER_1, HASH_BUILDER_2],
+        );
         assert_eq!(filter.len(), 0);
         assert!(filter.is_empty());
         assert_eq!(filter.capacity(), 160);
@@ -675,7 +879,8 @@ mod tests {
 
     #[test]
     fn test_insert() {
-        let mut filter = CuckooFilter::<String>::new(100);
+        let mut filter =
+            CuckooFilter::<String>::with_hashers(100, [HASH_BUILDER_1, HASH_BUILDER_2]);
         filter.insert("foo");
         assert_eq!(filter.len(), 1);
         assert!(!filter.is_empty());
@@ -684,7 +889,8 @@ mod tests {
 
     #[test]
     fn test_insert_existing_item() {
-        let mut filter = CuckooFilter::<String>::new(100);
+        let mut filter =
+            CuckooFilter::<String>::with_hashers(100, [HASH_BUILDER_1, HASH_BUILDER_2]);
         filter.insert("foo");
         filter.insert("foo");
 
@@ -695,7 +901,12 @@ mod tests {
 
     #[test]
     fn test_insert_extra_items() {
-        let mut filter = CuckooFilter::<String>::from_parameters(1, 8, 1);
+        let mut filter = CuckooFilter::<String>::from_parameters_with_hashers(
+            1,
+            8,
+            1,
+            [HASH_BUILDER_1, HASH_BUILDER_2],
+        );
 
         filter.insert("foo");
         filter.insert("foobar");
@@ -711,7 +922,8 @@ mod tests {
 
     #[test]
     fn test_remove() {
-        let mut filter = CuckooFilter::<String>::new(100);
+        let mut filter =
+            CuckooFilter::<String>::with_hashers(100, [HASH_BUILDER_1, HASH_BUILDER_2]);
         filter.insert("foo");
         filter.remove("foo");
 
@@ -722,7 +934,12 @@ mod tests {
 
     #[test]
     fn test_remove_extra_items() {
-        let mut filter = CuckooFilter::<String>::from_parameters(1, 8, 1);
+        let mut filter = CuckooFilter::<String>::from_parameters_with_hashers(
+            1,
+            8,
+            1,
+            [HASH_BUILDER_1, HASH_BUILDER_2],
+        );
 
         filter.insert("foo");
         filter.insert("foobar");
@@ -739,7 +956,12 @@ mod tests {
     }
     #[test]
     fn test_remove_both_indexes() {
-        let mut filter = CuckooFilter::<String>::from_parameters(2, 8, 1);
+        let mut filter = CuckooFilter::<String>::from_parameters_with_hashers(
+            2,
+            8,
+            1,
+            [HASH_BUILDER_1, HASH_BUILDER_2],
+        );
 
         filter.insert("foobar");
         filter.insert("barfoo");
@@ -759,7 +981,12 @@ mod tests {
 
     #[test]
     fn test_clear() {
-        let mut filter = CuckooFilter::<String>::from_parameters(2, 8, 1);
+        let mut filter = CuckooFilter::<String>::from_parameters_with_hashers(
+            2,
+            8,
+            1,
+            [HASH_BUILDER_1, HASH_BUILDER_2],
+        );
 
         filter.insert("foobar");
         filter.insert("barfoo");
@@ -776,7 +1003,12 @@ mod tests {
 
     #[test]
     fn test_estimated_fpp() {
-        let mut filter = CuckooFilter::<String>::from_entries_per_index(100, 0.01, 4);
+        let mut filter = CuckooFilter::<String>::from_entries_per_index_with_hashers(
+            100,
+            0.01,
+            4,
+            [HASH_BUILDER_1, HASH_BUILDER_2],
+        );
         assert!(filter.estimated_fpp() < std::f64::EPSILON);
 
         filter.insert("foo");
@@ -799,11 +1031,6 @@ mod tests {
         assert_eq!(filter.entries_per_index, de_filter.entries_per_index);
         assert_eq!(filter.fingerprint_vec, de_filter.fingerprint_vec);
         assert_eq!(filter.extra_items, de_filter.extra_items);
-        // SipHasher doesn't implement PartialEq, but it does implement Debug,
-        // and its Debug impl does print all internal state.
-        assert_eq!(
-            format!("{:?}", filter.hashers),
-            format!("{:?}", de_filter.hashers)
-        );
+        assert_eq!(filter.hash_builders, de_filter.hash_builders);
     }
 }

@@ -1,13 +1,12 @@
 //! Space-efficient probabilistic data structure for approximate membership queries in a set.
 
-use rand::{Rng, XorShiftRng};
+use crate::SipHasherBuilder;
 #[cfg(feature = "serde")]
 use serde_crate::{Deserialize, Serialize};
-use siphasher::sip::SipHasher;
 use std::borrow::Borrow;
 use std::cmp::Ordering;
 use std::f64::consts;
-use std::hash::{Hash, Hasher};
+use std::hash::{BuildHasher, Hash, Hasher};
 use std::marker::PhantomData;
 
 const SHIFTED_MASK: u64 = 0b001;
@@ -52,7 +51,7 @@ const METADATA_BITS: u8 = 3;
     derive(Deserialize, Serialize),
     serde(crate = "serde_crate")
 )]
-pub struct QuotientFilter<T> {
+pub struct QuotientFilter<T, B = SipHasherBuilder> {
     quotient_bits: u8,
     remainder_bits: u8,
     // Defined as RR...RRMMM where R are remainder bits and M are metadata bits
@@ -66,25 +65,68 @@ pub struct QuotientFilter<T> {
     remainder_mask: u64,
     slot_mask: u64,
     table: Vec<u64>,
-    hasher: SipHasher,
+    hash_builder: B,
     len: usize,
     _marker: PhantomData<T>,
 }
 
 impl<T> QuotientFilter<T> {
-    fn get_hasher() -> SipHasher {
-        let mut rng = XorShiftRng::new_unseeded();
-        SipHasher::new_with_keys(rng.next_u64(), rng.next_u64())
+    /// Constructs a new, empty `QuotientFilter` with the specified number of quotient and
+    /// remainder bits. `quotient_bits` and `remainder_bits` must be positive integers whose sum
+    /// cannot exceed `64`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `quotient_bits` is 0, `remainder_bits` is 0, or if `quotient_bits +
+    /// remainder_bits` is greater than 64.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::quotient::QuotientFilter;
+    ///
+    /// let filter = QuotientFilter::<String>::new(8, 4);
+    /// ```
+    pub fn new(quotient_bits: u8, remainder_bits: u8) -> Self {
+        Self::with_hasher(
+            quotient_bits,
+            remainder_bits,
+            SipHasherBuilder::from_entropy(),
+        )
     }
 
+    /// Constructs a new, empty `QuotientFilter` that can store `capacity` items with an estimated
+    /// false positive probability of less than `fpp`. The ideal fullness of quotient filter is
+    /// 50%, so the contructed quotient filter will have a maximum capacity of `2 * capacity`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `capacity` is 0, or if `fpp` is not in the range `(0, 1)`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::quotient::QuotientFilter;
+    ///
+    /// let filter = QuotientFilter::<String>::from_fpp(100, 0.05);
+    /// ```
+    pub fn from_fpp(capacity: usize, fpp: f64) -> Self {
+        Self::from_fpp_with_hasher(capacity, fpp, SipHasherBuilder::from_entropy())
+    }
+}
+
+impl<T, B> QuotientFilter<T, B>
+where
+    B: BuildHasher,
+{
     fn get_hash<U>(&self, item: &U) -> u64
     where
         T: Borrow<U>,
         U: Hash + ?Sized,
     {
-        let mut sip = self.hasher;
-        item.hash(&mut sip);
-        sip.finish()
+        let mut hasher = self.hash_builder.build_hasher();
+        item.hash(&mut hasher);
+        hasher.finish()
     }
 
     fn get_mask(size: u8) -> u64 {
@@ -112,63 +154,6 @@ impl<T> QuotientFilter<T> {
         } else {
             *index -= 1;
         }
-    }
-
-    /// Constructs a new, empty `QuotientFilter` with the specified number of quotient and
-    /// remainder bits. `quotient_bits` and `remainder_bits` must be positive integers whose sum
-    /// cannot exceed `64`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `quotient_bits` is 0, `remainder_bits` is 0, or if `quotient_bits +
-    /// remainder_bits` is greater than 64.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use probabilistic_collections::quotient::QuotientFilter;
-    ///
-    /// let filter = QuotientFilter::<String>::new(8, 4);
-    /// ```
-    pub fn new(quotient_bits: u8, remainder_bits: u8) -> Self {
-        assert!(quotient_bits > 0);
-        assert!(remainder_bits > 0);
-        assert!(quotient_bits + remainder_bits <= 64);
-        let slot_bits = remainder_bits + METADATA_BITS;
-        let table_len = ((u64::from(slot_bits) * (1u64 << quotient_bits)) as usize + 63) / 64;
-        QuotientFilter {
-            quotient_bits,
-            remainder_bits,
-            slot_bits,
-            quotient_mask: Self::get_mask(quotient_bits),
-            remainder_mask: Self::get_mask(remainder_bits),
-            slot_mask: Self::get_mask(slot_bits),
-            table: vec![0; table_len],
-            hasher: Self::get_hasher(),
-            len: 0,
-            _marker: PhantomData,
-        }
-    }
-
-    /// Constructs a new, empty `QuotientFilter` that can store `capacity` items with an estimated
-    /// false positive probability of less than `fpp`. The ideal fullness of quotient filter is
-    /// 50%, so the contructed quotient filter will have a maximum capacity of `2 * capacity`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `capacity` is 0, or if `fpp` is not in the range `(0, 1)`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use probabilistic_collections::quotient::QuotientFilter;
-    ///
-    /// let filter = QuotientFilter::<String>::from_fpp(100, 0.05);
-    /// ```
-    pub fn from_fpp(capacity: usize, fpp: f64) -> Self {
-        let quotient_bits = ((capacity * 2) as f64).log2().ceil() as u8;
-        let remainder_bits = (1.0 / -2.0 / (1.0 - fpp).ln()).log2().ceil() as u8;
-        Self::new(quotient_bits, remainder_bits)
     }
 
     fn get_slot(&self, index: usize) -> u64 {
@@ -260,6 +245,70 @@ impl<T> QuotientFilter<T> {
             // set shifted flag for all slots after since they are all shifted
             curr_slot |= SHIFTED_MASK;
         }
+    }
+
+    /// Constructs a new, empty `QuotientFilter` with the specified number of quotient and
+    /// remainder bits, and hasher builder. `quotient_bits` and `remainder_bits` must be positive
+    /// integers whose sum cannot exceed `64`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `quotient_bits` is 0, `remainder_bits` is 0, or if `quotient_bits +
+    /// remainder_bits` is greater than 64.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::quotient::QuotientFilter;
+    /// use probabilistic_collections::SipHasherBuilder;
+    ///
+    /// let filter = QuotientFilter::<String>::with_hasher(8, 4, SipHasherBuilder::from_entropy());
+    /// ```
+    pub fn with_hasher(quotient_bits: u8, remainder_bits: u8, hash_builder: B) -> Self {
+        assert!(quotient_bits > 0);
+        assert!(remainder_bits > 0);
+        assert!(quotient_bits + remainder_bits <= 64);
+        let slot_bits = remainder_bits + METADATA_BITS;
+        let table_len = ((u64::from(slot_bits) * (1u64 << quotient_bits)) as usize + 63) / 64;
+        QuotientFilter {
+            quotient_bits,
+            remainder_bits,
+            slot_bits,
+            quotient_mask: Self::get_mask(quotient_bits),
+            remainder_mask: Self::get_mask(remainder_bits),
+            slot_mask: Self::get_mask(slot_bits),
+            table: vec![0; table_len],
+            hash_builder,
+            len: 0,
+            _marker: PhantomData,
+        }
+    }
+
+    /// Constructs a new, empty `QuotientFilter` that can store `capacity` items with an estimated
+    /// false positive probability of less than `fpp` with a specified hasher builder. The ideal
+    /// fullness of quotient filter is 50%, so the contructed quotient filter will have a maximum
+    /// capacity of `2 * capacity`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `capacity` is 0, or if `fpp` is not in the range `(0, 1)`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::quotient::QuotientFilter;
+    /// use probabilistic_collections::SipHasherBuilder;
+    ///
+    /// let filter = QuotientFilter::<String>::from_fpp_with_hasher(
+    ///     100,
+    ///     0.05,
+    ///     SipHasherBuilder::from_entropy(),
+    /// );
+    /// ```
+    pub fn from_fpp_with_hasher(capacity: usize, fpp: f64, hash_builder: B) -> Self {
+        let quotient_bits = ((capacity * 2) as f64).log2().ceil() as u8;
+        let remainder_bits = (1.0 / -2.0 / (1.0 - fpp).ln()).log2().ceil() as u8;
+        Self::with_hasher(quotient_bits, remainder_bits, hash_builder)
     }
 
     /// Inserts an element into the quotient filter.
@@ -629,6 +678,20 @@ impl<T> QuotientFilter<T> {
         let fill_ratio = self.len() as f64 / self.capacity() as f64;
         1.0 - consts::E.powf(-fill_ratio / 2.0f64.powf(f64::from(self.remainder_bits)))
     }
+
+    /// Returns a reference to the quotient filter's hasher builder.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use probabilistic_collections::quotient::QuotientFilter;
+    ///
+    /// let filter = QuotientFilter::<String>::new(8, 4);
+    /// let hasher_builder = filter.hasher();
+    /// ```
+    pub fn hasher(&self) -> &B {
+        &self.hash_builder
+    }
 }
 
 use std::fmt;
@@ -645,7 +708,7 @@ impl<T> fmt::Debug for QuotientFilter<T> {
 #[cfg(test)]
 mod tests {
     use super::QuotientFilter;
-    use rand::{thread_rng, Rng};
+    use rand::{thread_rng, Rng, SeedableRng};
 
     #[test]
     fn test_new() {
@@ -742,17 +805,12 @@ mod tests {
         assert_eq!(filter.slot_mask, de_filter.slot_mask);
         assert_eq!(filter.table, de_filter.table);
         assert_eq!(filter.len, de_filter.len);
-        // SipHasher doesn't implement PartialEq, but it does implement Debug,
-        // and its Debug impl does print all internal state.
-        assert_eq!(
-            format!("{:?}", filter.hasher),
-            format!("{:?}", de_filter.hasher)
-        );
+        assert_eq!(filter.hash_builder, de_filter.hash_builder);
     }
 
     #[test]
     fn test_stress() {
-        let mut rng: rand::XorShiftRng = rand::SeedableRng::from_seed([1, 1, 1, 1]);
+        let mut rng = rand::XorShiftRng::from_seed([1, 1, 1, 1]);
         let quotient_bits = 16;
         let remainder_bits = 48;
         let n = 18;
