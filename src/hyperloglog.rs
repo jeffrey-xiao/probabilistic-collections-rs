@@ -26,8 +26,9 @@ use std::marker::PhantomData;
 /// ```
 /// # use std::f64::EPSILON;
 /// use probabilistic_collections::hyperloglog::HyperLogLog;
+/// use probabilistic_collections::SipHasherBuilder;
 ///
-/// let mut hhl = HyperLogLog::<u32>::new(0.1);
+/// let mut hhl = HyperLogLog::<u32>::with_hasher(0.1, SipHasherBuilder::from_seed(0, 0));
 ///
 /// assert!(hhl.is_empty());
 ///
@@ -147,8 +148,9 @@ where
     /// ```
     /// # use std::f64::EPSILON;
     /// use probabilistic_collections::hyperloglog::HyperLogLog;
+    /// use probabilistic_collections::SipHasherBuilder;
     ///
-    /// let mut hhl1 = HyperLogLog::<u32>::new(0.1);
+    /// let mut hhl1 = HyperLogLog::<u32>::with_hasher(0.1, SipHasherBuilder::from_seed(0, 0));
     /// hhl1.insert(&0);
     /// hhl1.insert(&1);
     ///
@@ -273,6 +275,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::HyperLogLog;
+    use crate::util::tests::HASH_BUILDER_1;
     use std::f64::EPSILON;
 
     #[test]
@@ -291,7 +294,7 @@ mod tests {
 
     #[test]
     fn test_simple() {
-        let mut hhl = HyperLogLog::<u32>::new(0.01);
+        let mut hhl = HyperLogLog::<u32>::with_hasher(0.01, HASH_BUILDER_1);
         assert!(hhl.is_empty());
         assert!(hhl.len() < EPSILON);
 
@@ -308,7 +311,7 @@ mod tests {
 
     #[test]
     fn test_merge() {
-        let mut hhl1 = HyperLogLog::<u32>::new(0.01);
+        let mut hhl1 = HyperLogLog::<u32>::with_hasher(0.01, HASH_BUILDER_1);
 
         for key in &[0, 1, 2, 0, 1, 2] {
             hhl1.insert(&key);
