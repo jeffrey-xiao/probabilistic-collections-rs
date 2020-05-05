@@ -316,7 +316,7 @@ where
         let fingerprint_bit_count = power.log2().ceil() as usize;
         let exact_bucket_len = (item_count + entries_per_index - 1) / entries_per_index;
         let bucket_len = exact_bucket_len.next_power_of_two();
-        let ret = CuckooFilter {
+        CuckooFilter {
             max_kicks: DEFAULT_MAX_KICKS,
             entries_per_index,
             fingerprint_vec: BitArrayVec::new(
@@ -327,8 +327,7 @@ where
             hash_builders,
             rng: XorShiftRng::new_unseeded(),
             _marker: PhantomData,
-        };
-        ret
+        }
     }
 
     /// Constructs a new, empty `CuckooFilter` with an estimated max capacity of `item_count`, an
@@ -781,7 +780,7 @@ where
     /// let hashers = filter.hashers();
     /// ```
     pub fn hashers(&self) -> &[B; 2] {
-        return &self.hash_builders;
+        &self.hash_builders
     }
 }
 

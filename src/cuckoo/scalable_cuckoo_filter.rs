@@ -447,7 +447,10 @@ where
     /// let hashers = filter.hashers();
     /// ```
     pub fn hashers(&self) -> &[B; 2] {
-        self.filters.first().expect("Expected non-empty filters.").hashers()
+        self.filters
+            .first()
+            .expect("Expected non-empty filters.")
+            .hashers()
     }
 }
 
