@@ -428,7 +428,10 @@ where
         }
 
         // item in canonical slot
-        if slot >> METADATA_BITS == remainder {
+        if slot >> METADATA_BITS == remainder
+            && slot & CONTINUATION_MASK == 0
+            && slot & SHIFTED_MASK == 0
+        {
             return true;
         }
 
