@@ -314,8 +314,13 @@ where
     ///
     /// ```
     /// use probabilistic_collections::bloom::BloomFilter;
+    /// use probabilistic_collections::SipHasherBuilder;
     ///
-    /// let mut filter = BloomFilter::<String>::from_fpp(100, 0.01);
+    /// let mut filter = BloomFilter::<String>::from_fpp_with_hashers(
+    ///     100,
+    ///     0.01,
+    ///     [SipHasherBuilder::from_seed(0, 0), SipHasherBuilder::from_seed(1, 1)],
+    /// );
     /// filter.insert("foo");
     ///
     /// assert_eq!(filter.count_ones(), 7);
@@ -330,8 +335,13 @@ where
     ///
     /// ```
     /// use probabilistic_collections::bloom::BloomFilter;
+    /// use probabilistic_collections::SipHasherBuilder;
     ///
-    /// let mut filter = BloomFilter::<String>::from_fpp(100, 0.01);
+    /// let mut filter = BloomFilter::<String>::from_fpp_with_hashers(
+    ///     100,
+    ///     0.01,
+    ///     [SipHasherBuilder::from_seed(0, 0), SipHasherBuilder::from_seed(1, 1)],
+    /// );
     /// filter.insert("foo");
     ///
     /// assert_eq!(filter.count_zeros(), 93);

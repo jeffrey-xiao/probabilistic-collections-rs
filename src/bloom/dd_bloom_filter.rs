@@ -253,8 +253,13 @@ where
     ///
     /// ```
     /// use probabilistic_collections::bloom::BSBloomFilter;
+    /// use probabilistic_collections::SipHasherBuilder;
     ///
-    /// let mut filter = BSBloomFilter::<String>::new(10, 0.01);
+    /// let mut filter = BSBloomFilter::<String>::with_hashers(
+    ///     10,
+    ///     0.01,
+    ///     [SipHasherBuilder::from_seed(0, 0), SipHasherBuilder::from_seed(1, 1)],
+    /// );
     /// filter.insert("foo");
     ///
     /// assert_eq!(filter.count_ones(), 7);
@@ -269,8 +274,13 @@ where
     ///
     /// ```
     /// use probabilistic_collections::bloom::BSBloomFilter;
+    /// use probabilistic_collections::SipHasherBuilder;
     ///
-    /// let mut filter = BSBloomFilter::<String>::new(10, 0.01);
+    /// let mut filter = BSBloomFilter::<String>::with_hashers(
+    ///     10,
+    ///     0.01,
+    ///     [SipHasherBuilder::from_seed(0, 0), SipHasherBuilder::from_seed(1, 1)],
+    /// );
     /// filter.insert("foo");
     ///
     /// assert_eq!(filter.count_zeros(), 63);
@@ -540,8 +550,13 @@ where
     ///
     /// ```
     /// use probabilistic_collections::bloom::BSSDBloomFilter;
+    /// use probabilistic_collections::SipHasherBuilder;
     ///
-    /// let mut filter = BSSDBloomFilter::<String>::new(10, 0.01);
+    /// let mut filter = BSSDBloomFilter::<String>::with_hashers(
+    ///     10,
+    ///     0.01,
+    ///     [SipHasherBuilder::from_seed(0, 0), SipHasherBuilder::from_seed(1, 1)],
+    /// );
     /// filter.insert("foo");
     ///
     /// assert_eq!(filter.count_ones(), 7);
@@ -556,8 +571,13 @@ where
     ///
     /// ```
     /// use probabilistic_collections::bloom::BSSDBloomFilter;
+    /// use probabilistic_collections::SipHasherBuilder;
     ///
-    /// let mut filter = BSSDBloomFilter::<String>::new(10, 0.01);
+    /// let mut filter = BSSDBloomFilter::<String>::with_hashers(
+    ///     10,
+    ///     0.01,
+    ///     [SipHasherBuilder::from_seed(0, 0), SipHasherBuilder::from_seed(1, 1)],
+    /// );
     /// filter.insert("foo");
     ///
     /// assert_eq!(filter.count_zeros(), 63);
@@ -831,8 +851,13 @@ where
     ///
     /// ```
     /// use probabilistic_collections::bloom::RLBSBloomFilter;
+    /// use probabilistic_collections::SipHasherBuilder;
     ///
-    /// let mut filter = RLBSBloomFilter::<String>::new(10, 0.01);
+    /// let mut filter = RLBSBloomFilter::<String>::with_hashers(
+    ///     10,
+    ///     0.01,
+    ///     [SipHasherBuilder::from_seed(0, 0), SipHasherBuilder::from_seed(1, 1)],
+    /// );
     /// filter.insert("foo");
     ///
     /// assert_eq!(filter.count_ones(), 7);
@@ -850,8 +875,13 @@ where
     ///
     /// ```
     /// use probabilistic_collections::bloom::RLBSBloomFilter;
+    /// use probabilistic_collections::SipHasherBuilder;
     ///
-    /// let mut filter = RLBSBloomFilter::<String>::new(10, 0.01);
+    /// let mut filter = RLBSBloomFilter::<String>::with_hashers(
+    ///     10,
+    ///     0.01,
+    ///     [SipHasherBuilder::from_seed(0, 0), SipHasherBuilder::from_seed(1, 1)],
+    /// );
     /// filter.insert("foo");
     ///
     /// assert_eq!(filter.count_zeros(), 63);

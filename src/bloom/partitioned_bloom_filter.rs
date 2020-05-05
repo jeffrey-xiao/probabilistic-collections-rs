@@ -294,8 +294,13 @@ where
     ///
     /// ```
     /// use probabilistic_collections::bloom::PartitionedBloomFilter;
+    /// use probabilistic_collections::SipHasherBuilder;
     ///
-    /// let mut filter = PartitionedBloomFilter::<String>::from_item_count(10, 0.01);
+    /// let mut filter = PartitionedBloomFilter::<String>::from_item_count_with_hashers(
+    ///     10,
+    ///     0.01,
+    ///     [SipHasherBuilder::from_seed(0, 0), SipHasherBuilder::from_seed(1, 1)],
+    /// );
     /// filter.insert("foo");
     ///
     /// assert_eq!(filter.count_ones(), 7);
@@ -310,8 +315,13 @@ where
     ///
     /// ```
     /// use probabilistic_collections::bloom::PartitionedBloomFilter;
+    /// use probabilistic_collections::SipHasherBuilder;
     ///
-    /// let mut filter = PartitionedBloomFilter::<String>::from_item_count(10, 0.01);
+    /// let mut filter = PartitionedBloomFilter::<String>::from_item_count_with_hashers(
+    ///     10,
+    ///     0.01,
+    ///     [SipHasherBuilder::from_seed(0, 0), SipHasherBuilder::from_seed(1, 1)],
+    /// );
     /// filter.insert("foo");
     ///
     /// assert_eq!(filter.count_zeros(), 91);
