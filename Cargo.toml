@@ -22,7 +22,8 @@ codecov = { repository = "jeffrey-xiao/probabilistic-collections-rs", service = 
 [dependencies]
 bincode = "1.0"
 byteorder = "1"
-rand = "0.4"
+rand = "0.7.0"
+rand_xorshift = "0.2.0"
 siphasher = "0.3.2"
 
 [dependencies.serde_crate]

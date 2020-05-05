@@ -711,7 +711,7 @@ impl<T> fmt::Debug for QuotientFilter<T> {
 #[cfg(test)]
 mod tests {
     use super::QuotientFilter;
-    use rand::{thread_rng, Rng, SeedableRng};
+    use rand::{Rng, SeedableRng, seq::SliceRandom};
 
     #[test]
     fn test_new() {
@@ -813,7 +813,7 @@ mod tests {
 
     #[test]
     fn test_stress() {
-        let mut rng = rand::XorShiftRng::from_seed([1, 1, 1, 1]);
+        let mut rng = rand_xorshift::XorShiftRng::seed_from_u64(1);
         let quotient_bits = 16;
         let remainder_bits = 48;
         let n = 18;
@@ -826,9 +826,9 @@ mod tests {
 
         let mut items = Vec::new();
         for _ in 0..1 << quotient_bits {
-            let mut item = rng.gen_range::<u64>(1 << n, 1 << 63) as u64;
+            let mut item = rng.gen_range(1 << n, 1 << 63);
             while filter.contains(&item) {
-                item = rng.gen_range::<u64>(1 << n, 1 << 63) as u64;
+                item = rng.gen_range(1 << n, 1 << 63);
             }
             filter.insert(&item);
             filter.insert(&item);
@@ -836,14 +836,14 @@ mod tests {
         }
 
         for _ in 0..100 {
-            let item = rng.gen_range::<u64>(0, 1 << n);
+            let item = rng.gen_range(0, 1 << n);
             assert!(!filter.contains(&item));
             filter.remove(&item);
         }
 
         assert_eq!(filter.len(), items.len());
 
-        thread_rng().shuffle(&mut items);
+        items.shuffle(&mut rng);
         for item in items {
             assert!(filter.contains(&item));
             filter.remove(&item);

@@ -1,7 +1,8 @@
 use crate::bit_array_vec::BitArrayVec;
 use crate::cuckoo::{DEFAULT_ENTRIES_PER_INDEX, DEFAULT_FINGERPRINT_BIT_COUNT, DEFAULT_MAX_KICKS};
 use crate::SipHasherBuilder;
-use rand::{Rng, XorShiftRng};
+use rand::{Rng, SeedableRng};
+use rand_xorshift::XorShiftRng;
 #[cfg(feature = "serde")]
 use serde_crate::{Deserialize, Serialize};
 use std::borrow::Borrow;
@@ -47,7 +48,7 @@ pub struct CuckooFilter<T, B = SipHasherBuilder> {
     fingerprint_vec: BitArrayVec,
     pub(super) extra_items: Vec<(u64, usize)>,
     hash_builders: [B; 2],
-    #[cfg_attr(feature = "serde", serde(skip, default = "XorShiftRng::new_unseeded"))]
+    #[cfg_attr(feature = "serde", serde(skip, default = "XorShiftRng::from_entropy"))]
     rng: XorShiftRng,
     _marker: PhantomData<T>,
 }
@@ -221,7 +222,7 @@ where
             ),
             extra_items: Vec::new(),
             hash_builders,
-            rng: XorShiftRng::new_unseeded(),
+            rng: XorShiftRng::from_entropy(),
             _marker: PhantomData,
         }
     }
@@ -275,7 +276,7 @@ where
             ),
             extra_items: Vec::new(),
             hash_builders,
-            rng: XorShiftRng::new_unseeded(),
+            rng: XorShiftRng::from_entropy(),
             _marker: PhantomData,
         }
     }
@@ -325,7 +326,7 @@ where
             ),
             extra_items: Vec::new(),
             hash_builders,
-            rng: XorShiftRng::new_unseeded(),
+            rng: XorShiftRng::from_entropy(),
             _marker: PhantomData,
         }
     }
@@ -378,7 +379,7 @@ where
             ),
             extra_items: Vec::new(),
             hash_builders,
-            rng: XorShiftRng::new_unseeded(),
+            rng: XorShiftRng::from_entropy(),
             _marker: PhantomData,
         }
     }
