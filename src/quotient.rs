@@ -711,7 +711,7 @@ impl<T> fmt::Debug for QuotientFilter<T> {
 #[cfg(test)]
 mod tests {
     use super::QuotientFilter;
-    use rand::{Rng, SeedableRng, seq::SliceRandom};
+    use rand::{seq::SliceRandom, Rng, SeedableRng};
 
     #[test]
     fn test_new() {
