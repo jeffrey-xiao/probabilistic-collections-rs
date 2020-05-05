@@ -703,8 +703,14 @@ where
     ///
     /// ```
     /// use probabilistic_collections::cuckoo::CuckooFilter;
+    /// use probabilistic_collections::SipHasherBuilder;
     ///
-    /// let mut filter = CuckooFilter::<String>::from_parameters(1, 8, 1);
+    /// let mut filter = CuckooFilter::<String>::from_parameters_with_hashers(
+    ///     1,
+    ///     8,
+    ///     1,
+    ///     [SipHasherBuilder::from_seed(0, 0), SipHasherBuilder::from_seed(1, 1)],
+    /// );
     ///
     /// filter.insert("foo");
     /// filter.insert("foobar");
