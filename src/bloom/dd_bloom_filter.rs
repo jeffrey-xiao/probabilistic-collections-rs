@@ -1,6 +1,7 @@
 use crate::bit_vec::BitVec;
 use crate::{DoubleHasher, HashIter, SipHasherBuilder};
-use rand::{Rng, XorShiftRng};
+use rand::{Rng, SeedableRng};
+use rand_xorshift::XorShiftRng;
 #[cfg(feature = "serde")]
 use serde_crate::{Deserialize, Serialize};
 use std::borrow::Borrow;
@@ -40,7 +41,7 @@ use std::marker::PhantomData;
 pub struct BSBloomFilter<T, B = SipHasherBuilder> {
     bit_vec: BitVec,
     hasher: DoubleHasher<T, B>,
-    #[cfg_attr(feature = "serde", serde(skip, default = "XorShiftRng::new_unseeded"))]
+    #[cfg_attr(feature = "serde", serde(skip, default = "XorShiftRng::from_entropy"))]
     rng: XorShiftRng,
     bit_count: usize,
     hasher_count: usize,
@@ -98,7 +99,7 @@ where
         BSBloomFilter {
             bit_vec: BitVec::new(bit_count * hasher_count),
             hasher: DoubleHasher::with_hashers(hash_builders),
-            rng: XorShiftRng::new_unseeded(),
+            rng: XorShiftRng::from_entropy(),
             bit_count,
             hasher_count,
             _marker: PhantomData,
@@ -336,7 +337,7 @@ where
 pub struct BSSDBloomFilter<T, B = SipHasherBuilder> {
     bit_vec: BitVec,
     hasher: DoubleHasher<T, B>,
-    #[cfg_attr(feature = "serde", serde(skip, default = "XorShiftRng::new_unseeded"))]
+    #[cfg_attr(feature = "serde", serde(skip, default = "XorShiftRng::from_entropy"))]
     rng: XorShiftRng,
     bit_count: usize,
     hasher_count: usize,
@@ -394,7 +395,7 @@ where
         BSSDBloomFilter {
             bit_vec: BitVec::new(bit_count * hasher_count),
             hasher: DoubleHasher::with_hashers(hash_builders),
-            rng: XorShiftRng::new_unseeded(),
+            rng: XorShiftRng::from_entropy(),
             bit_count,
             hasher_count,
             _marker: PhantomData,
@@ -633,7 +634,7 @@ where
 pub struct RLBSBloomFilter<T, B = SipHasherBuilder> {
     bit_vecs: Vec<BitVec>,
     hasher: DoubleHasher<T, B>,
-    #[cfg_attr(feature = "serde", serde(skip, default = "XorShiftRng::new_unseeded"))]
+    #[cfg_attr(feature = "serde", serde(skip, default = "XorShiftRng::from_entropy"))]
     rng: XorShiftRng,
     bit_count: usize,
     hasher_count: usize,
@@ -691,7 +692,7 @@ where
         RLBSBloomFilter {
             bit_vecs: vec![BitVec::new(bit_count); hasher_count],
             hasher: DoubleHasher::with_hashers(hash_builders),
-            rng: XorShiftRng::new_unseeded(),
+            rng: XorShiftRng::from_entropy(),
             bit_count,
             hasher_count,
             _marker: PhantomData,
