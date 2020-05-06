@@ -156,10 +156,18 @@ pub mod tests {
     use siphasher::sip::SipHasher;
 
     pub fn hash_builder_1() -> SipHasherBuilder {
-        SipHasherBuilder { k0: 0, k1: 0, hasher: SipHasher::new_with_keys(0, 0) }
+        SipHasherBuilder {
+            k0: 0,
+            k1: 0,
+            hasher: SipHasher::new_with_keys(0, 0),
+        }
     }
 
     pub fn hash_builder_2() -> SipHasherBuilder {
-        SipHasherBuilder { k0: 1, k1: 1, hasher: SipHasher::new_with_keys(1, 1) }
+        SipHasherBuilder {
+            k0: 1,
+            k1: 1,
+            hasher: SipHasher::new_with_keys(1, 1),
+        }
     }
 }

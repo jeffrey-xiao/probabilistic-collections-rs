@@ -826,7 +826,8 @@ mod tests {
 
     #[test]
     fn test_new() {
-        let filter = CuckooFilter::<String>::with_hashers(100, [hash_builder_1(), hash_builder_2()]);
+        let filter =
+            CuckooFilter::<String>::with_hashers(100, [hash_builder_1(), hash_builder_2()]);
         assert_eq!(filter.len(), 0);
         assert!(filter.is_empty());
         assert_eq!(filter.capacity(), 128);
