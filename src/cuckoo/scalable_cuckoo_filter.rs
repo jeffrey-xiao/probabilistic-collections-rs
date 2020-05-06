@@ -457,7 +457,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::ScalableCuckooFilter;
-    use crate::util::tests::{HASH_BUILDER_1, HASH_BUILDER_2};
+    use crate::util::tests::{hash_builder_1, hash_builder_2};
 
     #[test]
     pub fn test_new() {
@@ -576,7 +576,7 @@ mod tests {
             0.01,
             2.0,
             0.5,
-            [HASH_BUILDER_1, HASH_BUILDER_2],
+            [hash_builder_1(), hash_builder_2()],
         );
         assert!(scf.estimated_fpp() < std::f64::EPSILON);
 

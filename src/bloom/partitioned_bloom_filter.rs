@@ -371,14 +371,14 @@ where
 #[cfg(test)]
 mod tests {
     use super::PartitionedBloomFilter;
-    use crate::util::tests::{HASH_BUILDER_1, HASH_BUILDER_2};
+    use crate::util::tests::{hash_builder_1, hash_builder_2};
 
     #[test]
     fn test_from_item_count() {
         let mut filter = PartitionedBloomFilter::<String>::from_item_count_with_hashers(
             10,
             0.01,
-            [HASH_BUILDER_1, HASH_BUILDER_2],
+            [hash_builder_1(), hash_builder_2()],
         );
 
         assert!(!filter.contains("foo"));
@@ -400,7 +400,7 @@ mod tests {
         let mut filter = PartitionedBloomFilter::<String>::from_bit_count_with_hashers(
             10,
             0.01,
-            [HASH_BUILDER_1, HASH_BUILDER_2],
+            [hash_builder_1(), hash_builder_2()],
         );
 
         assert!(!filter.contains("foo"));
@@ -422,7 +422,7 @@ mod tests {
         let mut filter = PartitionedBloomFilter::<String>::from_item_count_with_hashers(
             100,
             0.01,
-            [HASH_BUILDER_1, HASH_BUILDER_2],
+            [hash_builder_1(), hash_builder_2()],
         );
         assert!(filter.estimated_fpp() < std::f64::EPSILON);
 

@@ -804,7 +804,7 @@ impl<T> PartialEq for CuckooFilter<T> {
 #[cfg(test)]
 mod tests {
     use super::CuckooFilter;
-    use crate::util::tests::{HASH_BUILDER_1, HASH_BUILDER_2};
+    use crate::util::tests::{hash_builder_1, hash_builder_2};
 
     #[test]
     fn test_get_fingerprint() {
@@ -826,7 +826,7 @@ mod tests {
 
     #[test]
     fn test_new() {
-        let filter = CuckooFilter::<String>::with_hashers(100, [HASH_BUILDER_1, HASH_BUILDER_2]);
+        let filter = CuckooFilter::<String>::with_hashers(100, [hash_builder_1(), hash_builder_2()]);
         assert_eq!(filter.len(), 0);
         assert!(filter.is_empty());
         assert_eq!(filter.capacity(), 128);
@@ -841,7 +841,7 @@ mod tests {
             100,
             16,
             8,
-            [HASH_BUILDER_1, HASH_BUILDER_2],
+            [hash_builder_1(), hash_builder_2()],
         );
         assert_eq!(filter.len(), 0);
         assert!(filter.is_empty());
@@ -857,7 +857,7 @@ mod tests {
             100,
             0.01,
             4,
-            [HASH_BUILDER_1, HASH_BUILDER_2],
+            [hash_builder_1(), hash_builder_2()],
         );
         assert_eq!(filter.len(), 0);
         assert!(filter.is_empty());
@@ -873,7 +873,7 @@ mod tests {
             100,
             0.01,
             10,
-            [HASH_BUILDER_1, HASH_BUILDER_2],
+            [hash_builder_1(), hash_builder_2()],
         );
         assert_eq!(filter.len(), 0);
         assert!(filter.is_empty());
@@ -886,7 +886,7 @@ mod tests {
     #[test]
     fn test_insert() {
         let mut filter =
-            CuckooFilter::<String>::with_hashers(100, [HASH_BUILDER_1, HASH_BUILDER_2]);
+            CuckooFilter::<String>::with_hashers(100, [hash_builder_1(), hash_builder_2()]);
         filter.insert("foo");
         assert_eq!(filter.len(), 1);
         assert!(!filter.is_empty());
@@ -896,7 +896,7 @@ mod tests {
     #[test]
     fn test_insert_existing_item() {
         let mut filter =
-            CuckooFilter::<String>::with_hashers(100, [HASH_BUILDER_1, HASH_BUILDER_2]);
+            CuckooFilter::<String>::with_hashers(100, [hash_builder_1(), hash_builder_2()]);
         filter.insert("foo");
         filter.insert("foo");
 
@@ -911,7 +911,7 @@ mod tests {
             1,
             8,
             1,
-            [HASH_BUILDER_1, HASH_BUILDER_2],
+            [hash_builder_1(), hash_builder_2()],
         );
 
         filter.insert("foo");
@@ -929,7 +929,7 @@ mod tests {
     #[test]
     fn test_remove() {
         let mut filter =
-            CuckooFilter::<String>::with_hashers(100, [HASH_BUILDER_1, HASH_BUILDER_2]);
+            CuckooFilter::<String>::with_hashers(100, [hash_builder_1(), hash_builder_2()]);
         filter.insert("foo");
         filter.remove("foo");
 
@@ -944,7 +944,7 @@ mod tests {
             1,
             8,
             1,
-            [HASH_BUILDER_1, HASH_BUILDER_2],
+            [hash_builder_1(), hash_builder_2()],
         );
 
         filter.insert("foo");
@@ -966,7 +966,7 @@ mod tests {
             2,
             8,
             1,
-            [HASH_BUILDER_1, HASH_BUILDER_2],
+            [hash_builder_1(), hash_builder_2()],
         );
 
         filter.insert("foobar");
@@ -991,7 +991,7 @@ mod tests {
             2,
             8,
             1,
-            [HASH_BUILDER_1, HASH_BUILDER_2],
+            [hash_builder_1(), hash_builder_2()],
         );
 
         filter.insert("foobar");
@@ -1013,7 +1013,7 @@ mod tests {
             100,
             0.01,
             4,
-            [HASH_BUILDER_1, HASH_BUILDER_2],
+            [hash_builder_1(), hash_builder_2()],
         );
         assert!(filter.estimated_fpp() < std::f64::EPSILON);
 

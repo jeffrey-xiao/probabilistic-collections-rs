@@ -912,12 +912,12 @@ where
 #[cfg(test)]
 mod tests {
     use super::{BSBloomFilter, BSSDBloomFilter, RLBSBloomFilter};
-    use crate::util::tests::{HASH_BUILDER_1, HASH_BUILDER_2};
+    use crate::util::tests::{hash_builder_1, hash_builder_2};
 
     #[test]
     fn test_bs() {
         let mut filter =
-            BSBloomFilter::<String>::with_hashers(10, 0.01, [HASH_BUILDER_1, HASH_BUILDER_2]);
+            BSBloomFilter::<String>::with_hashers(10, 0.01, [hash_builder_1(), hash_builder_2()]);
 
         assert!(!filter.contains("foo"));
         filter.insert("foo");
@@ -952,7 +952,7 @@ mod tests {
     #[test]
     fn test_bssd() {
         let mut filter =
-            BSSDBloomFilter::<String>::with_hashers(10, 0.01, [HASH_BUILDER_1, HASH_BUILDER_2]);
+            BSSDBloomFilter::<String>::with_hashers(10, 0.01, [hash_builder_1(), hash_builder_2()]);
 
         assert!(!filter.contains("foo"));
         filter.insert("foo");
@@ -987,7 +987,7 @@ mod tests {
     #[test]
     fn test_rlbs() {
         let mut filter =
-            RLBSBloomFilter::<String>::with_hashers(10, 0.01, [HASH_BUILDER_1, HASH_BUILDER_2]);
+            RLBSBloomFilter::<String>::with_hashers(10, 0.01, [hash_builder_1(), hash_builder_2()]);
 
         assert!(!filter.contains("foo"));
         filter.insert("foo");

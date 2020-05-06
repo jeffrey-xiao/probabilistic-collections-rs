@@ -352,7 +352,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::ScalableBloomFilter;
-    use crate::util::tests::{HASH_BUILDER_1, HASH_BUILDER_2};
+    use crate::util::tests::{hash_builder_1, hash_builder_2};
 
     #[test]
     fn test_scalable_bloom_filter() {
@@ -361,7 +361,7 @@ mod tests {
             0.01,
             2.0,
             0.5,
-            [HASH_BUILDER_1, HASH_BUILDER_2],
+            [hash_builder_1(), hash_builder_2()],
         );
 
         assert!(!filter.contains("foo"));
@@ -386,7 +386,7 @@ mod tests {
             0.01,
             2.0,
             0.5,
-            [HASH_BUILDER_1, HASH_BUILDER_2],
+            [hash_builder_1(), hash_builder_2()],
         );
 
         for i in 0..15 {
@@ -406,7 +406,7 @@ mod tests {
             0.01,
             2.0,
             0.5,
-            [HASH_BUILDER_1, HASH_BUILDER_2],
+            [hash_builder_1(), hash_builder_2()],
         );
         assert!(filter.estimated_fpp() < std::f64::EPSILON);
 

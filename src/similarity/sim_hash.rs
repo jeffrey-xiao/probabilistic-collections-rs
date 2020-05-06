@@ -221,11 +221,11 @@ mod tests {
     use super::SimHash;
     use crate::similarity::tests::{S1, S2, S3};
     use crate::similarity::ShingleIterator;
-    use crate::util::tests::HASH_BUILDER_1;
+    use crate::util::tests::hash_builder_1;
 
     #[test]
     fn test_sim_hash() {
-        let sim_hash = SimHash::with_hasher(HASH_BUILDER_1);
+        let sim_hash = SimHash::with_hasher(hash_builder_1());
 
         assert_eq!(
             sim_hash.get_sim_hash(ShingleIterator::new(2, S1.split(' ').collect())),

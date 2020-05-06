@@ -6,6 +6,7 @@ use std::borrow::Borrow;
 use std::hash::BuildHasher;
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
+use std::{cmp, fmt};
 
 /// The default hash builder for all collections.
 #[cfg_attr(
@@ -13,10 +14,11 @@ use std::marker::PhantomData;
     derive(Deserialize, Serialize),
     serde(crate = "serde_crate")
 )]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy)]
 pub struct SipHasherBuilder {
     k0: u64,
     k1: u64,
+    hasher: SipHasher,
 }
 
 impl SipHasherBuilder {
@@ -44,14 +46,33 @@ impl SipHasherBuilder {
     /// let hash_builder = SipHasherBuilder::from_seed(0, 0);
     /// ```
     pub fn from_seed(k0: u64, k1: u64) -> Self {
-        SipHasherBuilder { k0, k1 }
+        SipHasherBuilder {
+            k0,
+            k1,
+            hasher: SipHasher::new_with_keys(k0, k1),
+        }
+    }
+}
+
+impl fmt::Debug for SipHasherBuilder {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SipHasherBuilder")
+            .field("k0", &self.k0)
+            .field("k1", &self.k1)
+            .finish()
+    }
+}
+
+impl cmp::PartialEq for SipHasherBuilder {
+    fn eq(&self, other: &SipHasherBuilder) -> bool {
+        self.k0 == other.k0 && self.k1 == other.k1
     }
 }
 
 impl BuildHasher for SipHasherBuilder {
     type Hasher = SipHasher;
     fn build_hasher(&self) -> SipHasher {
-        SipHasher::new_with_keys(self.k0, self.k1)
+        self.hasher
     }
 }
 
@@ -129,7 +150,13 @@ impl Iterator for HashIter {
 #[cfg(test)]
 pub mod tests {
     use super::SipHasherBuilder;
+    use siphasher::sip::SipHasher;
 
-    pub static HASH_BUILDER_1: SipHasherBuilder = SipHasherBuilder { k0: 0, k1: 0 };
-    pub static HASH_BUILDER_2: SipHasherBuilder = SipHasherBuilder { k0: 1, k1: 1 };
+    pub fn hash_builder_1() -> SipHasherBuilder {
+        SipHasherBuilder { k0: 0, k1: 0, hasher: SipHasher::new_with_keys(0, 0) }
+    }
+
+    pub fn hash_builder_2() -> SipHasherBuilder {
+        SipHasherBuilder { k0: 1, k1: 1, hasher: SipHasher::new_with_keys(1, 1) }
+    }
 }

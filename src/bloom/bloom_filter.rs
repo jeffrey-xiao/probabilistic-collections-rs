@@ -388,12 +388,12 @@ where
 #[cfg(test)]
 mod tests {
     use super::BloomFilter;
-    use crate::util::tests::{HASH_BUILDER_1, HASH_BUILDER_2};
+    use crate::util::tests::{hash_builder_1, hash_builder_2};
 
     #[test]
     fn test_new() {
         let mut filter =
-            BloomFilter::<String>::with_hashers(10, 0.01, [HASH_BUILDER_1, HASH_BUILDER_2]);
+            BloomFilter::<String>::with_hashers(10, 0.01, [hash_builder_1(), hash_builder_2()]);
 
         assert!(!filter.contains("foo"));
         filter.insert("foo");
@@ -413,7 +413,7 @@ mod tests {
         let mut filter = BloomFilter::<String>::from_fpp_with_hashers(
             100,
             0.01,
-            [HASH_BUILDER_1, HASH_BUILDER_2],
+            [hash_builder_1(), hash_builder_2()],
         );
 
         assert!(!filter.contains("foo"));
@@ -434,7 +434,7 @@ mod tests {
         let mut filter = BloomFilter::<String>::from_item_count_with_hashers(
             100,
             10,
-            [HASH_BUILDER_1, HASH_BUILDER_2],
+            [hash_builder_1(), hash_builder_2()],
         );
 
         assert!(!filter.contains("foo"));
@@ -453,7 +453,7 @@ mod tests {
     #[test]
     fn test_estimated_fpp() {
         let mut filter =
-            BloomFilter::<String>::with_hashers(100, 0.01, [HASH_BUILDER_1, HASH_BUILDER_2]);
+            BloomFilter::<String>::with_hashers(100, 0.01, [hash_builder_1(), hash_builder_2()]);
         assert!(filter.estimated_fpp() < std::f64::EPSILON);
 
         filter.insert("foo");

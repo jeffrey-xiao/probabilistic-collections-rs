@@ -245,12 +245,12 @@ mod tests {
     use super::MinHash;
     use crate::similarity::tests::{S1, S2, S3};
     use crate::similarity::ShingleIterator;
-    use crate::util::tests::{HASH_BUILDER_1, HASH_BUILDER_2};
+    use crate::util::tests::{hash_builder_1, hash_builder_2};
     use std::f64;
 
     #[test]
     fn test_min_hash() {
-        let min_hash = MinHash::with_hashers(100, [HASH_BUILDER_1, HASH_BUILDER_2]);
+        let min_hash = MinHash::with_hashers(100, [hash_builder_1(), hash_builder_2()]);
 
         let similarity = min_hash.get_similarity(
             ShingleIterator::new(2, S1.split(' ').collect()),
