@@ -71,6 +71,8 @@ impl cmp::PartialEq for SipHasherBuilder {
 
 impl BuildHasher for SipHasherBuilder {
     type Hasher = SipHasher;
+
+    #[inline]
     fn build_hasher(&self) -> SipHasher {
         self.hasher
     }
@@ -138,6 +140,7 @@ pub struct HashIter {
 impl Iterator for HashIter {
     type Item = u64;
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let ret = self.a;
         self.a = self.a.wrapping_add(self.b);
