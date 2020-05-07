@@ -449,13 +449,11 @@ where
 
                     // end of run
                     if slot & CONTINUATION_MASK == 0 {
-                        break;
+                        return false;
                     }
                 }
             }
         }
-
-        false
     }
 
     /// Removes an element from the quotient filter.
@@ -813,12 +811,12 @@ mod tests {
 
     #[test]
     fn test_stress() {
-        let mut rng = rand_xorshift::XorShiftRng::seed_from_u64(1);
+        let mut rng = rand_xorshift::XorShiftRng::from_entropy();
         let quotient_bits = 16;
         let remainder_bits = 48;
         let n = 18;
 
-        // large remainder to not get false positives
+        // large remainder to decrease chance of false positives
         let mut filter = QuotientFilter::<u64>::new(quotient_bits, remainder_bits);
         assert!(filter.is_empty());
         assert_eq!(filter.quotient_bits(), quotient_bits);
@@ -833,15 +831,8 @@ mod tests {
             filter.insert(&item);
             filter.insert(&item);
             items.push(item);
+            assert_eq!(filter.len(), items.len());
         }
-
-        for _ in 0..100 {
-            let item = rng.gen_range(0, 1 << n);
-            assert!(!filter.contains(&item));
-            filter.remove(&item);
-        }
-
-        assert_eq!(filter.len(), items.len());
 
         items.shuffle(&mut rng);
         for item in items {

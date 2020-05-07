@@ -10,6 +10,8 @@ use std::cmp;
 use std::hash::{BuildHasher, Hash, Hasher};
 use std::marker::PhantomData;
 
+const EMPTY_FINGERPRINT: &[u8] = &[0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8];
+
 /// A space-efficient probabilistic data structure to test for membership in a set. Cuckoo filters
 /// also provide the flexibility to remove items.
 ///
@@ -541,18 +543,15 @@ where
         }
         for bucket_index in 0..entries_per_index {
             let vec_index_1 = self.get_vec_index(index_1, bucket_index);
-            let vec_index_2 = self.get_vec_index(index_2, bucket_index);
             let fingerprint_1 = &self.fingerprint_vec.get(vec_index_1);
-            let fingerprint_2 = &self.fingerprint_vec.get(vec_index_2);
             if Self::get_raw_fingerprint(fingerprint_1) == raw_fingerprint {
-                let empty_fingerprint = Self::get_fingerprint(0);
-                self.fingerprint_vec
-                    .set(vec_index_1, empty_fingerprint.as_slice());
-            }
-            if Self::get_raw_fingerprint(fingerprint_2) == raw_fingerprint {
-                let empty_fingerprint = Self::get_fingerprint(0);
-                self.fingerprint_vec
-                    .set(vec_index_2, empty_fingerprint.as_slice());
+                self.fingerprint_vec.set(vec_index_1, EMPTY_FINGERPRINT);
+            } else {
+                let vec_index_2 = self.get_vec_index(index_2, bucket_index);
+                let fingerprint_2 = &self.fingerprint_vec.get(vec_index_2);
+                if Self::get_raw_fingerprint(fingerprint_2) == raw_fingerprint {
+                    self.fingerprint_vec.set(vec_index_2, EMPTY_FINGERPRINT);
+                }
             }
         }
     }
