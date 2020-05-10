@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["BitArrayVec","A growable list of bit arrays implemented using a `Vec<u8>`."],["BitArrayVecIntoIter","An iterator for `BitArrayVec`."],["BitArrayVecIter","An owning iterator for `BitArrayVec`."]]});

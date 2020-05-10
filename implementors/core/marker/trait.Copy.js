@@ -1,0 +1,3 @@
+(function() {var implementors = {};
+implementors["probabilistic_collections"] = [{"text":"impl <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/marker/trait.Copy.html\" title=\"trait core::marker::Copy\">Copy</a> for <a class=\"struct\" href=\"probabilistic_collections/struct.SipHasherBuilder.html\" title=\"struct probabilistic_collections::SipHasherBuilder\">SipHasherBuilder</a>","synthetic":false,"types":["probabilistic_collections::util::SipHasherBuilder"]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

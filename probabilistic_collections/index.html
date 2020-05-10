@@ -1,0 +1,101 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `probabilistic_collections` crate."><meta name="keywords" content="rust, rustlang, rust-lang, probabilistic_collections"><title>probabilistic_collections - Rust</title><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../dark.css"><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script src="../storage.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="shortcut icon" href="../favicon.ico"><style type="text/css">#crate-search{background-image:url("../down-arrow.svg");}</style></head><body class="rustdoc mod"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../probabilistic_collections/index.html'><div class='logo-container'><img src='../rust-logo.png' alt='logo'></div></a><p class='location'>Crate probabilistic_collections</p><div class="sidebar-elems"><a id='all-types' href='all.html'><p>See all probabilistic_collections's items</p></a><div class="block items"><ul><li><a href="#modules">Modules</a></li><li><a href="#structs">Structs</a></li></ul></div><p class='location'></p><script>window.sidebarCurrent = {name: 'probabilistic_collections', ty: 'mod', relpath: '../'};</script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../settings.html"><img src="../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class='fqn'><span class='out-of-band'><span id='render-detail'><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class='inner'>&#x2212;</span>]</a></span><a class='srclink' href='../src/probabilistic_collections/lib.rs.html#1-77' title='goto source code'>[src]</a></span><span class='in-band'>Crate <a class="mod" href=''>probabilistic_collections</a></span></h1><div class='docblock'><h1 id="probabilistic-collections-rs" class="section-header"><a href="#probabilistic-collections-rs">probabilistic-collections-rs</a></h1>
+<p><a href="https://crates.io/crates/probabilistic-collections"><img src="http://meritbadge.herokuapp.com/probabilistic-collections" alt="probabilistic-collections" /></a>
+<a href="https://docs.rs/probabilistic-collections"><img src="https://docs.rs/probabilistic-collections/badge.svg" alt="Documentation" /></a>
+<a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" /></a>
+<a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License: Apache 2.0" /></a>
+<a href="https://travis-ci.org/jeffrey-xiao/probabilistic-collections-rs"><img src="https://travis-ci.org/jeffrey-xiao/probabilistic-collections-rs.svg?branch=master" alt="Build Status" /></a>
+<a href="https://codecov.io/gh/jeffrey-xiao/probabilistic-collections-rs"><img src="https://codecov.io/gh/jeffrey-xiao/probabilistic-collections-rs/branch/master/graph/badge.svg" alt="codecov" /></a></p>
+<p><code>probabilistic-collections</code> contains various implementations of collections that use
+randomization to improve on running time or memory, but introduce a certain amount of error.
+The error can be controlled under a certain threshold which makes these data structures
+extremely useful for big data and streaming applications.</p>
+<h2 id="usage" class="section-header"><a href="#usage">Usage</a></h2>
+<p>Add this to your <code>Cargo.toml</code>:</p>
+<pre><code class="language-toml">[dependencies]
+probabilistic-collections = &quot;*&quot;
+</code></pre>
+<p>and this to your crate root if you are using Rust 2015:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">probabilistic_collections</span>;</pre></div>
+<h2 id="changelog" class="section-header"><a href="#changelog">Changelog</a></h2>
+<p>See <a href="CHANGELOG.md">CHANGELOG</a> for more details.</p>
+<h2 id="references" class="section-header"><a href="#references">References</a></h2>
+<ul>
+<li><a href="https://arxiv.org/abs/1212.3964">Advanced Bloom Filter Based Algorithms for Efficient Approximate Data De-Duplication in Streams</a></li>
+</ul>
+<blockquote>
+<p>Bera, Suman K., Sourav Dutta, Ankur Narang, and Souvik Bhattacherjee. 2012. &quot;Advanced Bloom Filter Based Algorithms for Efficient Approximate Data de-Duplication in Streams.&quot; <em>CoRR</em> abs/1212.3964. <a href="http://arxiv.org/abs/1212.3964">http://arxiv.org/abs/1212.3964</a>.</p>
+</blockquote>
+<ul>
+<li><a href="https://dl.acm.org/citation.cfm?id=1073718">An improved data stream summary: the count-min sketch and its applications</a></li>
+</ul>
+<blockquote>
+<p>Cormode, Graham, and S. Muthukrishnan. 2005. &quot;An Improved Data Stream Summary: The Count-Min Sketch and Its Applications.&quot; <em>J. Algorithms</em> 55 (1). Duluth, MN, USA: Academic Press, Inc.: 58--75. <a href="https://doi.org/10.1016/j.jalgor.2003.12.001">https://doi.org/10.1016/j.jalgor.2003.12.001</a>.</p>
+</blockquote>
+<ul>
+<li><a href="https://dl.acm.org/citation.cfm?id=2674994">Cuckoo Filter: Practically Better Than Bloom</a></li>
+</ul>
+<blockquote>
+<p>Fan, Bin, Dave G. Andersen, Michael Kaminsky, and Michael D. Mitzenmacher. 2014. &quot;Cuckoo Filter: Practically Better Than Bloom.&quot; In <em>Proceedings of the 10th Acm International on Conference on Emerging Networking Experiments and Technologies</em>, 75--88. CoNEXT '14. New York, NY, USA: ACM. <a href="https://doi.org/10.1145/2674005.2674994">https://doi.org/10.1145/2674005.2674994</a>.</p>
+</blockquote>
+<ul>
+<li><a href="https://dl.acm.org/citation.cfm?id=2350275">Don't thrash: how to cache your hash on flash</a></li>
+</ul>
+<blockquote>
+<p>Bender, Michael A., Martin Farach-Colton, Rob Johnson, Russell Kraner, Bradley C. Kuszmaul, Dzejla Medjedovic, Pablo Montes, Pradeep Shetty, Richard P. Spillane, and Erez Zadok. 2012. &quot;Don'T Thrash: How to Cache Your Hash on Flash.&quot; <em>Proc. VLDB Endow.</em> 5 (11). VLDB Endowment: 1627--37. <a href="https://doi.org/10.14778/2350229.2350275">https://doi.org/10.14778/2350229.2350275</a>.</p>
+</blockquote>
+<ul>
+<li><a href="https://dl.acm.org/citation.cfm?id=2452456">HyperLogLog in practice: algorithmic engineering of a state of the art cardinality estimation algorithm</a></li>
+</ul>
+<blockquote>
+<p>Heule, Stefan, Marc Nunkesser, and Alexander Hall. 2013. &quot;HyperLogLog in Practice: Algorithmic Engineering of a State of the Art Cardinality Estimation Algorithm.&quot; In <em>Proceedings of the 16th International Conference on Extending Database Technology</em>, 683--92. EDBT '13. New York, NY, USA: ACM. <a href="https://doi.org/10.1145/2452376.2452456">https://doi.org/10.1145/2452376.2452456</a>.</p>
+</blockquote>
+<ul>
+<li><a href="http://algo.inria.fr/flajolet/Publications/FlFuGaMe07.pdf">HyperLogLog: the analysis of a near-optimal cardinality estimation algorithm</a></li>
+</ul>
+<blockquote>
+<p>Flajolet, Philippe, Éric Fusy, Olivier Gandouet, and Frédéric Meunier. 2007. &quot;Hyperloglog: The Analysis of a Near-Optimal Cardinality Estimation Algorithm.&quot; In <em>IN Aofa '07: PROCEEDINGS of the 2007 International Conference on Analysis of Algorithms</em>.</p>
+</blockquote>
+<ul>
+<li><a href="https://dl.acm.org/citation.cfm?id=1400125">Less hashing, same performance: Building a better Bloom filter</a></li>
+</ul>
+<blockquote>
+<p>Kirsch, Adam, and Michael Mitzenmacher. 2008. &quot;Less Hashing, Same Performance: Building a Better Bloom Filter.&quot; <em>Random Struct. Algorithms</em> 33 (2). New York, NY, USA: John Wiley &amp; Sons, Inc.: 187--218. <a href="https://doi.org/10.1002/rsa.v33:2">https://doi.org/10.1002/rsa.v33:2</a>.</p>
+</blockquote>
+<ul>
+<li><a href="https://dl.acm.org/citation.cfm?id=276781">Min-wise independent permutations (extended abstract)</a></li>
+</ul>
+<blockquote>
+<p>Broder, Andrei Z., Moses Charikar, Alan M. Frieze, and Michael Mitzenmacher. 1998. &quot;Min-Wise Independent Permutations (Extended Abstract).&quot; In <em>Proceedings of the Thirtieth Annual Acm Symposium on Theory of Computing</em>, 327--36. STOC '98. New York, NY, USA: ACM. <a href="https://doi.org/10.1145/276698.276781">https://doi.org/10.1145/276698.276781</a>.</p>
+</blockquote>
+<ul>
+<li><a href="https://dl.acm.org/citation.cfm?id=2063737">Probabilistic near-duplicate detection using simhash</a></li>
+</ul>
+<blockquote>
+<p>Sood, Sadhan, and Dmitri Loguinov. 2011. &quot;Probabilistic Near-Duplicate Detection Using Simhash.&quot; In <em>Proceedings of the 20th Acm International Conference on Information and Knowledge Management</em>, 1117--26. CIKM '11. New York, NY, USA: ACM. <a href="https://doi.org/10.1145/2063576.2063737">https://doi.org/10.1145/2063576.2063737</a>.</p>
+</blockquote>
+<ul>
+<li><a href="https://dl.acm.org/citation.cfm?id=1224501">Scalable Bloom Filters</a></li>
+</ul>
+<blockquote>
+<p>Almeida, Paulo Sérgio, Carlos Baquero, Nuno Preguiça, and David Hutchison. 2007. &quot;Scalable Bloom Filters.&quot; <em>Inf. Process. Lett.</em> 101 (6). Amsterdam, The Netherlands, The Netherlands: Elsevier North-Holland, Inc.: 255--61. <a href="https://doi.org/10.1016/j.ipl.2006.10.007">https://doi.org/10.1016/j.ipl.2006.10.007</a>.</p>
+</blockquote>
+<h2 id="license" class="section-header"><a href="#license">License</a></h2>
+<p><code>probabilistic-collections-rs</code> is dual-licensed under the terms of either the MIT License or the
+Apache License (Version 2.0).</p>
+<p>See <a href="LICENSE-APACHE">LICENSE-APACHE</a> and <a href="LICENSE-MIT">LICENSE-MIT</a> for more details.</p>
+</div><h2 id='modules' class='section-header'><a href="#modules">Modules</a></h2>
+<table><tr class='module-item'><td><a class="mod" href="bit_array_vec/index.html" title='probabilistic_collections::bit_array_vec mod'>bit_array_vec</a></td><td class='docblock-short'><p>Growable list of bit arrays.</p>
+</td></tr><tr class='module-item'><td><a class="mod" href="bit_vec/index.html" title='probabilistic_collections::bit_vec mod'>bit_vec</a></td><td class='docblock-short'><p>Growable list of bits.</p>
+</td></tr><tr class='module-item'><td><a class="mod" href="bloom/index.html" title='probabilistic_collections::bloom mod'>bloom</a></td><td class='docblock-short'><p>Space-efficient probabilistic data structure for approximate membership queries in a set.</p>
+</td></tr><tr class='module-item'><td><a class="mod" href="count_min_sketch/index.html" title='probabilistic_collections::count_min_sketch mod'>count_min_sketch</a></td><td class='docblock-short'><p>Space-efficient probabilistic data structure for estimating the number of item occurrences.</p>
+</td></tr><tr class='module-item'><td><a class="mod" href="cuckoo/index.html" title='probabilistic_collections::cuckoo mod'>cuckoo</a></td><td class='docblock-short'><p>Space-efficient probabilistic data structure for approximate membership queries in a set with
+the ability to remove items.</p>
+</td></tr><tr class='module-item'><td><a class="mod" href="hyperloglog/index.html" title='probabilistic_collections::hyperloglog mod'>hyperloglog</a></td><td class='docblock-short'><p>Space-efficient probabilistic data structure for estimating the number of distinct items in a
+multiset.</p>
+</td></tr><tr class='module-item'><td><a class="mod" href="quotient/index.html" title='probabilistic_collections::quotient mod'>quotient</a></td><td class='docblock-short'><p>Space-efficient probabilistic data structure for approximate membership queries in a set.</p>
+</td></tr><tr class='module-item'><td><a class="mod" href="similarity/index.html" title='probabilistic_collections::similarity mod'>similarity</a></td><td class='docblock-short'><p>Locality-sensitive hashing schemes for measuring similarities between sets.</p>
+</td></tr></table><h2 id='structs' class='section-header'><a href="#structs">Structs</a></h2>
+<table><tr class='module-item'><td><a class="struct" href="struct.SipHasherBuilder.html" title='probabilistic_collections::SipHasherBuilder struct'>SipHasherBuilder</a></td><td class='docblock-short'><p>The default hash builder for all collections.</p>
+</td></tr></table></section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../";window.currentCrate = "probabilistic_collections";</script><script src="../aliases.js"></script><script src="../main.js"></script><script defer src="../search-index.js"></script></body></html>

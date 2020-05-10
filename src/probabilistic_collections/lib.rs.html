@@ -1,0 +1,157 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css"><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="shortcut icon" href="../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../probabilistic_collections/index.html'><div class='logo-container'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1"> 1</span>
+<span id="2"> 2</span>
+<span id="3"> 3</span>
+<span id="4"> 4</span>
+<span id="5"> 5</span>
+<span id="6"> 6</span>
+<span id="7"> 7</span>
+<span id="8"> 8</span>
+<span id="9"> 9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+</pre><div class="example-wrap"><pre class="rust ">
+<span class="doccomment">//! # probabilistic-collections-rs</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! [![probabilistic-collections](http://meritbadge.herokuapp.com/probabilistic-collections)](https://crates.io/crates/probabilistic-collections)</span>
+<span class="doccomment">//! [![Documentation](https://docs.rs/probabilistic-collections/badge.svg)](https://docs.rs/probabilistic-collections)</span>
+<span class="doccomment">//! [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)</span>
+<span class="doccomment">//! [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)</span>
+<span class="doccomment">//! [![Build Status](https://travis-ci.org/jeffrey-xiao/probabilistic-collections-rs.svg?branch=master)](https://travis-ci.org/jeffrey-xiao/probabilistic-collections-rs)</span>
+<span class="doccomment">//! [![codecov](https://codecov.io/gh/jeffrey-xiao/probabilistic-collections-rs/branch/master/graph/badge.svg)](https://codecov.io/gh/jeffrey-xiao/probabilistic-collections-rs)</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! `probabilistic-collections` contains various implementations of collections that use</span>
+<span class="doccomment">//! randomization to improve on running time or memory, but introduce a certain amount of error.</span>
+<span class="doccomment">//! The error can be controlled under a certain threshold which makes these data structures</span>
+<span class="doccomment">//! extremely useful for big data and streaming applications.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ## Usage</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Add this to your `Cargo.toml`:</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ```toml</span>
+<span class="doccomment">//! [dependencies]</span>
+<span class="doccomment">//! probabilistic-collections = &quot;*&quot;</span>
+<span class="doccomment">//! ```</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! and this to your crate root if you are using Rust 2015:</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ```rust</span>
+<span class="doccomment">//! extern crate probabilistic_collections;</span>
+<span class="doccomment">//! ```</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ## Changelog</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! See [CHANGELOG](CHANGELOG.md) for more details.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ## References</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! - [Advanced Bloom Filter Based Algorithms for Efficient Approximate Data De-Duplication in Streams](https://arxiv.org/abs/1212.3964)</span>
+<span class="doccomment">//! &gt; Bera, Suman K., Sourav Dutta, Ankur Narang, and Souvik Bhattacherjee. 2012. &quot;Advanced Bloom Filter Based Algorithms for Efficient Approximate Data de-Duplication in Streams.&quot; *CoRR* abs/1212.3964. &lt;http://arxiv.org/abs/1212.3964&gt;.</span>
+<span class="doccomment">//! - [An improved data stream summary: the count-min sketch and its applications](https://dl.acm.org/citation.cfm?id=1073718)</span>
+<span class="doccomment">//! &gt; Cormode, Graham, and S. Muthukrishnan. 2005. &quot;An Improved Data Stream Summary: The Count-Min Sketch and Its Applications.&quot; *J. Algorithms* 55 (1). Duluth, MN, USA: Academic Press, Inc.: 58--75. &lt;https://doi.org/10.1016/j.jalgor.2003.12.001&gt;.</span>
+<span class="doccomment">//! - [Cuckoo Filter: Practically Better Than Bloom](https://dl.acm.org/citation.cfm?id=2674994)</span>
+<span class="doccomment">//! &gt; Fan, Bin, Dave G. Andersen, Michael Kaminsky, and Michael D. Mitzenmacher. 2014. &quot;Cuckoo Filter: Practically Better Than Bloom.&quot; In *Proceedings of the 10th Acm International on Conference on Emerging Networking Experiments and Technologies*, 75--88. CoNEXT &#39;14. New York, NY, USA: ACM. &lt;https://doi.org/10.1145/2674005.2674994&gt;.</span>
+<span class="doccomment">//! - [Don&#39;t thrash: how to cache your hash on flash](https://dl.acm.org/citation.cfm?id=2350275)</span>
+<span class="doccomment">//! &gt; Bender, Michael A., Martin Farach-Colton, Rob Johnson, Russell Kraner, Bradley C. Kuszmaul, Dzejla Medjedovic, Pablo Montes, Pradeep Shetty, Richard P. Spillane, and Erez Zadok. 2012. &quot;Don&#39;T Thrash: How to Cache Your Hash on Flash.&quot; *Proc. VLDB Endow.* 5 (11). VLDB Endowment: 1627--37. &lt;https://doi.org/10.14778/2350229.2350275&gt;.</span>
+<span class="doccomment">//! - [HyperLogLog in practice: algorithmic engineering of a state of the art cardinality estimation algorithm](https://dl.acm.org/citation.cfm?id=2452456)</span>
+<span class="doccomment">//! &gt; Heule, Stefan, Marc Nunkesser, and Alexander Hall. 2013. &quot;HyperLogLog in Practice: Algorithmic Engineering of a State of the Art Cardinality Estimation Algorithm.&quot; In *Proceedings of the 16th International Conference on Extending Database Technology*, 683--92. EDBT &#39;13. New York, NY, USA: ACM. &lt;https://doi.org/10.1145/2452376.2452456&gt;.</span>
+<span class="doccomment">//! - [HyperLogLog: the analysis of a near-optimal cardinality estimation algorithm](http://algo.inria.fr/flajolet/Publications/FlFuGaMe07.pdf)</span>
+<span class="doccomment">//! &gt; Flajolet, Philippe, Éric Fusy, Olivier Gandouet, and Frédéric Meunier. 2007. &quot;Hyperloglog: The Analysis of a Near-Optimal Cardinality Estimation Algorithm.&quot; In *IN Aofa &#39;07: PROCEEDINGS of the 2007 International Conference on Analysis of Algorithms*.</span>
+<span class="doccomment">//! - [Less hashing, same performance: Building a better Bloom filter](https://dl.acm.org/citation.cfm?id=1400125)</span>
+<span class="doccomment">//! &gt; Kirsch, Adam, and Michael Mitzenmacher. 2008. &quot;Less Hashing, Same Performance: Building a Better Bloom Filter.&quot; *Random Struct. Algorithms* 33 (2). New York, NY, USA: John Wiley &amp; Sons, Inc.: 187--218. &lt;https://doi.org/10.1002/rsa.v33:2&gt;.</span>
+<span class="doccomment">//! - [Min-wise independent permutations (extended abstract)](https://dl.acm.org/citation.cfm?id=276781)</span>
+<span class="doccomment">//! &gt; Broder, Andrei Z., Moses Charikar, Alan M. Frieze, and Michael Mitzenmacher. 1998. &quot;Min-Wise Independent Permutations (Extended Abstract).&quot; In *Proceedings of the Thirtieth Annual Acm Symposium on Theory of Computing*, 327--36. STOC &#39;98. New York, NY, USA: ACM. &lt;https://doi.org/10.1145/276698.276781&gt;.</span>
+<span class="doccomment">//! - [Probabilistic near-duplicate detection using simhash](https://dl.acm.org/citation.cfm?id=2063737)</span>
+<span class="doccomment">//! &gt; Sood, Sadhan, and Dmitri Loguinov. 2011. &quot;Probabilistic Near-Duplicate Detection Using Simhash.&quot; In *Proceedings of the 20th Acm International Conference on Information and Knowledge Management*, 1117--26. CIKM &#39;11. New York, NY, USA: ACM. &lt;https://doi.org/10.1145/2063576.2063737&gt;.</span>
+<span class="doccomment">//! - [Scalable Bloom Filters](https://dl.acm.org/citation.cfm?id=1224501)</span>
+<span class="doccomment">//! &gt; Almeida, Paulo Sérgio, Carlos Baquero, Nuno Preguiça, and David Hutchison. 2007. &quot;Scalable Bloom Filters.&quot; *Inf. Process. Lett.* 101 (6). Amsterdam, The Netherlands, The Netherlands: Elsevier North-Holland, Inc.: 255--61. &lt;https://doi.org/10.1016/j.ipl.2006.10.007&gt;.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! ## License</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! `probabilistic-collections-rs` is dual-licensed under the terms of either the MIT License or the</span>
+<span class="doccomment">//! Apache License (Version 2.0).</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! See [LICENSE-APACHE](LICENSE-APACHE) and [LICENSE-MIT](LICENSE-MIT) for more details.</span>
+
+<span class="attribute">#![<span class="ident">warn</span>(<span class="ident">missing_docs</span>)]</span>
+
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">bit_array_vec</span>;
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">bit_vec</span>;
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">bloom</span>;
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">count_min_sketch</span>;
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">cuckoo</span>;
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">hyperloglog</span>;
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">quotient</span>;
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">similarity</span>;
+<span class="kw">mod</span> <span class="ident">util</span>;
+
+<span class="kw">pub</span> <span class="kw">use</span> <span class="self">self</span>::<span class="ident">util</span>::<span class="ident">SipHasherBuilder</span>;
+<span class="kw">use</span> <span class="self">self</span>::<span class="ident">util</span>::{<span class="ident">DoubleHasher</span>, <span class="ident">HashIter</span>};
+</pre></div>
+</section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../";window.currentCrate = "probabilistic_collections";</script><script src="../../aliases.js"></script><script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script><script defer src="../../search-index.js"></script></body></html>

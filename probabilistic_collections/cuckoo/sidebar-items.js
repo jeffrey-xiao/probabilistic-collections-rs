@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["CuckooFilter","A space-efficient probabilistic data structure to test for membership in a set. Cuckoo filters also provide the flexibility to remove items."],["ScalableCuckooFilter","A growable, space-efficient probabilistic data structure to test for membership in a set. Scalable cuckoo filters also provide the flexibility to remove items."]]});
