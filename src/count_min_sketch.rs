@@ -71,8 +71,8 @@ impl CountStrategy for CountMedianBiasStrategy {
 ///
 /// let mut count_min_sketch = CountMinSketch::<CountMinStrategy, String>::new(3, 28);
 ///
-/// count_min_sketch.add("foo", 3);
-/// count_min_sketch.add("bar", 5);
+/// count_min_sketch.insert("foo", 3);
+/// count_min_sketch.insert("bar", 5);
 /// assert_eq!(count_min_sketch.count("foo"), 3);
 /// assert_eq!(count_min_sketch.count("bar"), 5);
 ///
@@ -228,10 +228,10 @@ where
     /// use probabilistic_collections::count_min_sketch::{CountMinSketch, CountMinStrategy};
     ///
     /// let mut count_min_sketch = CountMinSketch::<CountMinStrategy, String>::from_error(0.1, 0.05);
-    /// count_min_sketch.add("foo", 3);
+    /// count_min_sketch.insert("foo", 3);
     /// assert_eq!(count_min_sketch.count("foo"), 3);
     /// ```
-    pub fn add<V>(&mut self, item: &V, value: i64)
+    pub fn insert<V>(&mut self, item: &V, value: i64)
     where
         U: Borrow<V>,
         V: Hash + ?Sized,
@@ -251,7 +251,7 @@ where
     /// use probabilistic_collections::count_min_sketch::{CountMinSketch, CountMinStrategy};
     ///
     /// let mut count_min_sketch = CountMinSketch::<CountMinStrategy, String>::from_error(0.1, 0.05);
-    /// count_min_sketch.add("foo", 3);
+    /// count_min_sketch.insert("foo", 3);
     /// count_min_sketch.remove("foo", 2);
     /// assert_eq!(count_min_sketch.count("foo"), 1);
     /// ```
@@ -260,7 +260,7 @@ where
         U: Borrow<V>,
         V: Hash + ?Sized,
     {
-        self.add(item, -value);
+        self.insert(item, -value);
     }
 
     /// Returns the estimated number of times `item` is in the count-min sketch.
@@ -271,7 +271,7 @@ where
     /// use probabilistic_collections::count_min_sketch::{CountMinSketch, CountMinStrategy};
     ///
     /// let mut count_min_sketch = CountMinSketch::<CountMinStrategy, String>::from_error(0.1, 0.05);
-    /// count_min_sketch.add("foo", 3);
+    /// count_min_sketch.insert("foo", 3);
     /// assert_eq!(count_min_sketch.count("foo"), 3);
     /// ```
     pub fn count<V>(&self, item: &V) -> i64
@@ -297,7 +297,7 @@ where
     /// use probabilistic_collections::count_min_sketch::{CountMinSketch, CountMinStrategy};
     ///
     /// let mut count_min_sketch = CountMinSketch::<CountMinStrategy, String>::from_error(0.1, 0.05);
-    /// count_min_sketch.add("foo", 3);
+    /// count_min_sketch.insert("foo", 3);
     /// count_min_sketch.clear();
     /// assert_eq!(count_min_sketch.count("foo"), 0);
     /// ```
@@ -435,16 +435,16 @@ mod tests {
                     }
 
                     #[test]
-                    fn test_add() {
+                    fn test_insert() {
                         let mut cms = CountMinSketch::<$strategy, String, SipHasherBuilder>::from_error(0.1, 0.05);
-                        cms.add("foo", 3);
+                        cms.insert("foo", 3);
                         assert_eq!(cms.count("foo"), 3);
                     }
 
                     #[test]
                     fn test_remove() {
                         let mut cms = CountMinSketch::<$strategy, String, SipHasherBuilder>::from_error(0.1, 0.05);
-                        cms.add("foo", 3);
+                        cms.insert("foo", 3);
                         cms.remove("foo", 3);
                         assert_eq!(cms.count("foo"), 0);
                     }
@@ -452,7 +452,7 @@ mod tests {
                     #[test]
                     fn test_clear() {
                         let mut cms = CountMinSketch::<$strategy, String, SipHasherBuilder>::from_error(0.1, 0.05);
-                        cms.add("foo", 3);
+                        cms.insert("foo", 3);
                         cms.clear();
                         assert_eq!(cms.count("foo"), 0);
                     }
@@ -461,7 +461,7 @@ mod tests {
                     #[test]
                     fn test_ser_de() {
                         let mut cms = CountMinSketch::<$strategy, String, SipHasherBuilder>::from_error(0.1, 0.05);
-                        cms.add("foo", 3);
+                        cms.insert("foo", 3);
 
                         let serialized_cms = bincode::serialize(&cms).unwrap();
                         let de_cms: CountMinSketch<$strategy, String> = bincode::deserialize(&serialized_cms).unwrap();
