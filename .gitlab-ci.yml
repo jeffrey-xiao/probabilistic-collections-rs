@@ -1,0 +1,37 @@
+variables:
+  CARGO_HOME: $CI_PROJECT_DIR/.cargo
+
+stages:
+  - test
+  - lint
+
+cache:
+  paths:
+    - .cargo
+
+.build_template: &build
+  stage: test
+  script:
+  - cargo build --verbose --all-targets --all-features
+  - cargo test --verbose --all-targets --all-features
+
+stable:
+  <<: *build
+  image: "rust:latest"
+
+beta:
+  <<: *build
+  image: "instrumentisto/rust:beta"
+
+nightly:
+  <<: *build
+  image: "rustlang/rust:nightly"
+
+lint:
+  image: "rust:latest"
+  stage: lint
+  script:
+  - rustup component add rustfmt
+  - rustup component add clippy
+  - cargo clippy --verbose --all-targets --all-features
+  - cargo fmt --verbose --all -- --verbose --check
