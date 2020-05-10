@@ -1037,6 +1037,6 @@ mod tests {
         assert_eq!(filter.entries_per_index, de_filter.entries_per_index);
         assert_eq!(filter.fingerprint_vec, de_filter.fingerprint_vec);
         assert_eq!(filter.extra_items, de_filter.extra_items);
-        assert_eq!(filter.hash_builders, de_filter.hash_builders);
+        assert_eq!(filter.hashers(), de_filter.hashers());
     }
 }

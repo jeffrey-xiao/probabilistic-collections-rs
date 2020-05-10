@@ -264,6 +264,16 @@ mod tests {
         );
         assert!(f64::abs(similarity - 0.00) < f64::EPSILON);
 
+        let hash1 = min_hash.get_min_hashes(ShingleIterator::new(2, S1.split(' ').collect()));
+        let hash2 = min_hash.get_min_hashes(ShingleIterator::new(2, S2.split(' ').collect()));
+        let hash3 = min_hash.get_min_hashes(ShingleIterator::new(2, S3.split(' ').collect()));
+        assert!(
+            f64::abs(min_hash.get_similarity_from_hashes(&hash1, &hash2) - 0.49) < f64::EPSILON
+        );
+        assert!(
+            f64::abs(min_hash.get_similarity_from_hashes(&hash1, &hash3) - 0.00) < f64::EPSILON
+        );
+
         assert_eq!(min_hash.hasher_count(), 100);
     }
 
@@ -284,5 +294,8 @@ mod tests {
             ShingleIterator::new(2, S2.split(' ').collect()),
         );
         assert!((sim - de_sim).abs() < f64::EPSILON);
+
+        assert_eq!(min_hash.hasher_count(), de_min_hash.hasher_count());
+        assert_eq!(min_hash.hashers(), de_min_hash.hashers());
     }
 }

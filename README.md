@@ -4,13 +4,17 @@
 [![Documentation](https://docs.rs/probabilistic-collections/badge.svg)](https://docs.rs/probabilistic-collections)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Build Status](https://travis-ci.org/jeffrey-xiao/probabilistic-collections-rs.svg?branch=master)](https://travis-ci.org/jeffrey-xiao/probabilistic-collections-rs)
-[![codecov](https://codecov.io/gh/jeffrey-xiao/probabilistic-collections-rs/branch/master/graph/badge.svg)](https://codecov.io/gh/jeffrey-xiao/probabilistic-collections-rs)
+[![Pipeline Status](https://gitlab.com/jeffrey-xiao/probabilistic-collections-rs/badges/master/pipeline.svg)](https://gitlab.com/jeffrey-xiao/probabilistic-collections-rs/-/commits/master)
+[![Coverage Report](https://gitlab.com/jeffrey-xiao/probabilistic-collections-rs/badges/master/coverage.svg)](https://gitlab.com/jeffrey-xiao/probabilistic-collections-rs/-/commits/master)
 
 `probabilistic-collections` contains various implementations of collections that use randomization
 to improve on running time or memory, but introduce a certain amount of error. The error can be
 controlled under a certain threshold which makes these data structures extremely useful for big data
 and streaming applications.
+
+The following types of collections are implemented:
+
+- 
 
 ## Usage
 

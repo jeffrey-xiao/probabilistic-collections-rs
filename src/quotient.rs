@@ -788,27 +788,6 @@ mod tests {
         assert!(!filter.contains("barfoo"));
     }
 
-    #[cfg(feature = "serde")]
-    #[test]
-    fn test_ser_de() {
-        let mut filter = QuotientFilter::<String>::new(8, 4);
-        filter.insert("foo");
-
-        let serialized_filter = bincode::serialize(&filter).unwrap();
-        let de_filter: QuotientFilter<String> = bincode::deserialize(&serialized_filter).unwrap();
-
-        assert!(de_filter.contains("foo"));
-        assert_eq!(filter.quotient_bits, de_filter.quotient_bits);
-        assert_eq!(filter.remainder_bits, de_filter.remainder_bits);
-        assert_eq!(filter.slot_bits, de_filter.slot_bits);
-        assert_eq!(filter.quotient_mask, de_filter.quotient_mask);
-        assert_eq!(filter.remainder_mask, de_filter.remainder_mask);
-        assert_eq!(filter.slot_mask, de_filter.slot_mask);
-        assert_eq!(filter.table, de_filter.table);
-        assert_eq!(filter.len, de_filter.len);
-        assert_eq!(filter.hash_builder, de_filter.hash_builder);
-    }
-
     #[test]
     fn test_stress() {
         let mut rng = rand_xorshift::XorShiftRng::from_entropy();
@@ -840,5 +819,26 @@ mod tests {
             filter.remove(&item);
             assert!(!filter.contains(&item));
         }
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_ser_de() {
+        let mut filter = QuotientFilter::<String>::new(8, 4);
+        filter.insert("foo");
+
+        let serialized_filter = bincode::serialize(&filter).unwrap();
+        let de_filter: QuotientFilter<String> = bincode::deserialize(&serialized_filter).unwrap();
+
+        assert!(de_filter.contains("foo"));
+        assert_eq!(filter.quotient_bits(), de_filter.quotient_bits());
+        assert_eq!(filter.remainder_bits(), de_filter.remainder_bits());
+        assert_eq!(filter.slot_bits, de_filter.slot_bits);
+        assert_eq!(filter.quotient_mask, de_filter.quotient_mask);
+        assert_eq!(filter.remainder_mask, de_filter.remainder_mask);
+        assert_eq!(filter.slot_mask, de_filter.slot_mask);
+        assert_eq!(filter.table, de_filter.table);
+        assert_eq!(filter.len(), de_filter.len());
+        assert_eq!(filter.hasher(), de_filter.hasher());
     }
 }

@@ -467,11 +467,11 @@ mod tests {
                         let de_cms: CountMinSketch<$strategy, String> = bincode::deserialize(&serialized_cms).unwrap();
 
                         assert_eq!(cms.count("foo"), de_cms.count("foo"));
-                        assert_eq!(cms.rows, de_cms.rows);
-                        assert_eq!(cms.cols, de_cms.cols);
+                        assert_eq!(cms.rows(), de_cms.rows());
+                        assert_eq!(cms.cols(), de_cms.cols());
                         assert_eq!(cms.items, de_cms.items);
                         assert_eq!(cms.grid, de_cms.grid);
-                        assert_eq!(cms.hasher, de_cms.hasher);
+                        assert_eq!(cms.hashers(), de_cms.hashers());
                     }
                 }
             )*

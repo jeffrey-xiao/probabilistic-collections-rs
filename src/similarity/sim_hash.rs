@@ -256,7 +256,7 @@ mod tests {
     #[cfg(feature = "serde")]
     #[test]
     fn test_ser_de() {
-        let sim_hash = SimHash::new();
+        let sim_hash = SimHash::default();
         let serialized_sim_hash = bincode::serialize(&sim_hash).unwrap();
         let de_sim_hash: SimHash<ShingleIterator<str>, _> =
             bincode::deserialize(&serialized_sim_hash).unwrap();
@@ -265,5 +265,6 @@ mod tests {
             sim_hash.get_sim_hash(ShingleIterator::new(2, S1.split(' ').collect())),
             de_sim_hash.get_sim_hash(ShingleIterator::new(2, S1.split(' ').collect())),
         );
+        assert_eq!(sim_hash.hasher(), de_sim_hash.hasher());
     }
 }

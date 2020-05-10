@@ -445,6 +445,6 @@ mod tests {
         assert!(de_filter.contains("foo"));
         assert_eq!(filter.bit_vec, de_filter.bit_vec);
         assert_eq!(filter.bit_count, de_filter.bit_count);
-        assert_eq!(filter.hasher, filter.hasher);
+        assert_eq!(filter.hashers(), filter.hashers());
     }
 }

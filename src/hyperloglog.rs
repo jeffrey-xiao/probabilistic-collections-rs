@@ -345,6 +345,6 @@ mod tests {
         assert!((hhl.alpha - de_hhl.alpha).abs() < EPSILON);
         assert_eq!(hhl.p, de_hhl.p);
         assert_eq!(hhl.registers, de_hhl.registers);
-        assert_eq!(hhl.hash_builder, de_hhl.hash_builder);
+        assert_eq!(hhl.hasher(), de_hhl.hasher());
     }
 }
