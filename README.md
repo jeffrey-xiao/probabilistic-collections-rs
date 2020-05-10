@@ -14,7 +14,13 @@ and streaming applications.
 
 The following types of collections are implemented:
 
-- 
+- Approximate Membership in Set: `BloomFilter`, `PartitionedBloomFilter`, `CuckooFilter`,
+  `QuotientFilter`
+- Scalable Approximate Membership in Set: `ScalableBloomFilter`, `ScalableCuckooFilter`
+- Approximate Membership in Stream: `BSBloomFilter`, `BSSDBloomFilter`, `RLBSBloomFilter`
+- Approximate Item Count: `CountMinSketch`
+- Approximate Distinct Item Count: `HyperLogLog`
+- Set similarity: `MinHash`, `SimHash`
 
 ## Usage
 

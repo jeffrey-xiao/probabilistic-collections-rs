@@ -50,7 +50,7 @@ pages:
   stage: deploy
   script:
   - cargo doc --all --no-deps --verbose
-  - echo "<meta http-equiv=refresh content=0;url=extended_collections/index.html>" >target/doc/index.html
+  - echo "<meta http-equiv=refresh content=0;url=probabilistic_collections/index.html>" >target/doc/index.html
   - mv target/doc public
   artifacts:
     paths:
