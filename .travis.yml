@@ -36,9 +36,11 @@ script:
   - cargo +stable fmt --verbose --all -- --verbose --check
   - cargo +stable clippy --verbose --all-targets --all-features
   - cargo test --verbose --all-targets --all-features
-  - | if [ "$TRAVIS_RUST_VERSION" = "nightly" ]; then
-        cargo update -Zminimal-versions
-        cargo check --all-targets --all-features
+  - |
+    if [ "$TRAVIS_RUST_VERSION" = "nightly" ]; then
+      cargo update -Zminimal-versions &&
+      cargo check --all-targets --all-features
+    fi
 
 after_success:
   - |
