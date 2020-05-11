@@ -7,7 +7,7 @@
 [![Pipeline Status](https://gitlab.com/jeffrey-xiao/probabilistic-collections-rs/badges/master/pipeline.svg)](https://gitlab.com/jeffrey-xiao/probabilistic-collections-rs/-/commits/master)
 [![Coverage Report](https://gitlab.com/jeffrey-xiao/probabilistic-collections-rs/badges/master/coverage.svg)](https://gitlab.com/jeffrey-xiao/probabilistic-collections-rs/-/commits/master)
 
-`probabilistic-collections` contains various implementations of collections that use randomization
+`probabilistic-collections` contains various implementations of collections that use approximations
 to improve on running time or memory, but introduce a certain amount of error. The error can be
 controlled under a certain threshold which makes these data structures extremely useful for big data
 and streaming applications.
