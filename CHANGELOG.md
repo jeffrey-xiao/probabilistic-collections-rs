@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.7.0 - 2020-05-10
+
+### Added
+
+- Add `DoubleHasher` and `HashIter` to abstract away double hashing. A cubic was also added to
+  double hashing to improve the distribution (enhanced double hashing).
+- Add `SipHasherBuilder` as the default hash builder for all collections.
+- Add `with_hasher` methods to all collections to specify a custom hasher.
+
+### Changed
+
+- Rename `add` to `insert` in `CountMinSketch`.
+- Move insertion assertion for unique items in `QuotientFilter`. Previously, an assertion would fire
+  if a duplicate item is inserted into a full `QuotientFilter`. The new behavior is that the
+  assertion would only fire if an unique item is inserted into a full `QuotientFilter`.
+- Change RNGs to seed from entropy.
+
+### Fixed
+
+- Update minimal versions of dependencies so `cargo check --all-targets --all-features` passes after
+  running `cargo update -Zminimal-versions`.
+- Properly check that an item is in its canonical slot in `QuotientFilter`. Previously, only the
+  remainder was checked. The continuation and shifted bits must also be checked to ensure that the
+  item is in its canonical slot.
+- Fix issue with `ScalableCuckooFilter` where an overflow item is inserted into a new filter with
+  the wrong fingerprint. To maintain the false positive probability, the new filter may have a
+  larger item fingerprint than the old filter. It is incorrect to use the fingerprint of the old
+  filter in the new filter. The overflow item remains in the old filter.
+
 ## 0.6.0 - 2020-04-24
 
 ### Added
