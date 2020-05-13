@@ -97,7 +97,7 @@ impl<T> QuotientFilter<T> {
 
     /// Constructs a new, empty `QuotientFilter` that can store `capacity` items with an estimated
     /// false positive probability of less than `fpp`. The ideal fullness of quotient filter is
-    /// 50%, so the contructed quotient filter will have a maximum capacity of `2 * capacity`.
+    /// 75%, so the contructed quotient filter will have a maximum capacity of `1.33 * capacity`.
     ///
     /// # Panics
     ///
@@ -286,8 +286,8 @@ where
 
     /// Constructs a new, empty `QuotientFilter` that can store `capacity` items with an estimated
     /// false positive probability of less than `fpp` with a specified hasher builder. The ideal
-    /// fullness of quotient filter is 50%, so the contructed quotient filter will have a maximum
-    /// capacity of `2 * capacity`.
+    /// fullness of quotient filter is 75%, so the contructed quotient filter will have a maximum
+    /// capacity of `1.33 * capacity`.
     ///
     /// # Panics
     ///
@@ -306,7 +306,7 @@ where
     /// );
     /// ```
     pub fn from_fpp_with_hasher(capacity: usize, fpp: f64, hash_builder: B) -> Self {
-        let quotient_bits = ((capacity * 2) as f64).log2().ceil() as u8;
+        let quotient_bits = (capacity as f64 * 1.33).log2().ceil() as u8;
         let remainder_bits = (1.0 / -2.0 / (1.0 - fpp).ln()).log2().ceil() as u8;
         Self::with_hasher(quotient_bits, remainder_bits, hash_builder)
     }
@@ -524,7 +524,7 @@ where
             // update number of runs since the entire run gets shifted to left
             if next_slot & CONTINUATION_MASK == 0 {
                 runs_count += 1;
-                // next slow is a new run, so we can delete occupied bit of canonical position
+                // next slot is a new run, so we can delete occupied bit of canonical position
                 if is_run_start {
                     let canonical_slot = self.get_slot(quotient) & !OCCUPIED_MASK;
                     self.set_slot(quotient, canonical_slot);
