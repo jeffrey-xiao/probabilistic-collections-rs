@@ -34,3 +34,18 @@ features = ["std", "derive"]
 
 [features]
 serde = ["siphasher/serde", "serde_crate"]
+
+[dev-dependencies]
+criterion = "0.3"
+
+[[bench]]
+name = "bloom_filter"
+harness = false
+
+[[bench]]
+name = "cuckoo_filter"
+harness = false
+
+[[bench]]
+name = "quotient_filter"
+harness = false
