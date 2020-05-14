@@ -7,7 +7,7 @@ fn bench_insert(c: &mut Criterion) {
         c.bench_function(&format!("bench insert {}", initial_items), |b| {
             b.iter_batched_ref(
                 || {
-                    let mut filter = QuotientFilter::<u32>::from_fpp(1024, 0.01),
+                    let mut filter = QuotientFilter::<u32>::from_fpp(1024, 0.01);
                     for i in 0..initial_items {
                         filter.insert(&i);
                     }
