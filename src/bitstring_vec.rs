@@ -35,7 +35,7 @@ impl BitstringVec {
     #[inline]
     fn get_mask(size: usize) -> u64 {
         if size == 64 {
-            return !0;
+            !0
         } else {
             (1u64 << size) - 1
         }
@@ -280,23 +280,24 @@ mod tests {
         vec[0] = 0;
         assert_eq!(bsv.occupied_len(), 0);
 
-        for i in 0..len {
+        for (i, item) in vec.iter_mut().enumerate() {
             let bitstring = gen_bitstring(&mut rng, bit_count);
             bsv.set(i, bitstring);
-            vec[i] = bitstring;
+            *item = bitstring;
             assert_eq!(bsv.occupied_len(), i + 1);
         }
 
-        for i in 0..len {
-            assert_eq!(bsv.get(i), vec[i]);
+        for (i, item) in vec.iter_mut().enumerate() {
+            assert_eq!(bsv.get(i), *item);
             bsv.set(i, 0);
+            *item = 0;
             assert_eq!(bsv.occupied_len(), 8 - i - 1);
         }
 
-        for i in 0..len {
+        for (i, item) in vec.iter_mut().enumerate() {
             let bitstring = gen_bitstring(&mut rng, bit_count);
             bsv.set(i, bitstring);
-            vec[i] = bitstring;
+            *item = bitstring;
         }
 
         bsv.truncate(4);
