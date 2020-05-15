@@ -80,8 +80,8 @@
 
 #![warn(missing_docs)]
 
-pub mod bit_array_vec;
-pub mod bit_vec;
+mod bit_vec;
+mod bitstring_vec;
 pub mod bloom;
 pub mod count_min_sketch;
 pub mod cuckoo;

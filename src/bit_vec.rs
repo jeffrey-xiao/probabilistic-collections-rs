@@ -1,57 +1,9 @@
-//! Growable list of bits.
-
 #[cfg(feature = "serde")]
 use serde_crate::{Deserialize, Serialize};
 use std::mem;
 use std::ops::{Index, Range};
 use std::slice;
 
-/// A growable list of bits implemented using a `Vec<u8>`
-///
-/// # Examples
-///
-///
-/// ```
-/// use probabilistic_collections::bit_vec::BitVec;
-///
-/// let mut bv = BitVec::from_elem(5, false);
-///
-/// bv.set(0, true);
-/// bv.set(1, true);
-/// bv.set(2, true);
-/// assert_eq!(
-///     bv.iter().collect::<Vec<bool>>(),
-///     vec![true, true, true, false, false],
-/// );
-///
-/// bv.set_all(true);
-/// assert_eq!(
-///     bv.iter().collect::<Vec<bool>>(),
-///     vec![true, true, true, true, true],
-/// );
-///
-/// bv.flip(0);
-/// bv.flip_all();
-/// assert_eq!(
-///     bv.iter().collect::<Vec<bool>>(),
-///     vec![true, false, false, false, false],
-/// );
-///
-/// bv.push(true);
-/// assert_eq!(
-///     bv.iter().collect::<Vec<bool>>(),
-///     vec![true, false, false, false, false, true],
-/// );
-/// assert_eq!(bv.pop(), Some(true));
-///
-/// let clone = bv.clone();
-/// bv.flip_all();
-/// bv.union(&clone);
-/// assert_eq!(
-///     bv.iter().collect::<Vec<bool>>(),
-///     vec![true, true, true, true, true],
-/// );
-/// ```
 #[derive(Debug, PartialEq)]
 #[cfg_attr(
     feature = "serde",
@@ -89,19 +41,6 @@ impl BitVec {
         }
     }
 
-    /// Constructs a new `BitVec` with a certain number of bits. All bits are initialized to false.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use probabilistic_collections::bit_vec::BitVec;
-    ///
-    /// let bv = BitVec::new(5);
-    /// assert_eq!(
-    ///     bv.iter().collect::<Vec<bool>>(),
-    ///     vec![false, false, false, false, false],
-    /// );
-    /// ```
     pub fn new(len: usize) -> Self {
         Self {
             blocks: vec![0; Self::get_block_count(len)],
@@ -110,19 +49,6 @@ impl BitVec {
         }
     }
 
-    /// Constructs a new `BitVec` with a certain number of bits. All bits are initialized to `bit`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use probabilistic_collections::bit_vec::BitVec;
-    ///
-    /// let bv = BitVec::from_elem(5, true);
-    /// assert_eq!(
-    ///     bv.iter().collect::<Vec<bool>>(),
-    ///     vec![true, true, true, true, true],
-    /// );
-    /// ```
     pub fn from_elem(len: usize, bit: bool) -> Self {
         let mut ret = BitVec {
             blocks: vec![if bit { <u8>::max_value() } else { 0 }; Self::get_block_count(len)],
@@ -133,20 +59,6 @@ impl BitVec {
         ret
     }
 
-    /// Constructs a `BitVec` from a byte slice. Each byte becomes eight bits, with the most
-    /// signficant bits of each byte coming first.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use probabilistic_collections::bit_vec::BitVec;
-    ///
-    /// let bv = BitVec::from_bytes(&[0b11010000]);
-    /// assert_eq!(
-    ///     bv.iter().collect::<Vec<bool>>(),
-    ///     vec![true, true, false, true, false, false, false, false],
-    /// );
-    /// ```
     pub fn from_bytes(bytes: &[u8]) -> Self {
         let len = bytes.len() * BLOCK_BIT_COUNT;
         BitVec {
@@ -164,22 +76,6 @@ impl BitVec {
         }
     }
 
-    /// Returns the byte-vec representation of the `BitVec` with the first bit in the `BitVec`
-    /// becoming the high-order bit of the first byte.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use probabilistic_collections::bit_vec::BitVec;
-    ///
-    /// let mut bv = BitVec::new(8);
-    ///
-    /// bv.set(0, true);
-    /// bv.set(1, true);
-    /// bv.set(3, true);
-    ///
-    /// assert_eq!(bv.to_bytes(), vec![0b11010000]);
-    /// ```
     pub fn to_bytes(&self) -> Vec<u8> {
         self.blocks
             .iter()
@@ -187,15 +83,6 @@ impl BitVec {
             .collect()
     }
 
-    /// Constructs a new, empty `BitVec` with a certain capacity.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use probabilistic_collections::bit_vec::BitVec;
-    ///
-    /// let bv = BitVec::with_capacity(5);
-    /// ```
     pub fn with_capacity(len: usize) -> Self {
         BitVec {
             blocks: Vec::with_capacity(Self::get_block_count(len)),
@@ -204,23 +91,6 @@ impl BitVec {
         }
     }
 
-    /// Sets the value at index `index` to `bit`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if attempt to set an index out-of-bounds.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use probabilistic_collections::bit_vec::BitVec;
-    ///
-    /// let mut bv = BitVec::new(5);
-    /// bv.set(1, true);
-    ///
-    /// assert_eq!(bv.get(0), Some(false));
-    /// assert_eq!(bv.get(1), Some(true));
-    /// ```
     pub fn set(&mut self, index: usize, bit: bool) {
         assert!(index < self.len);
         let block_index = index / BLOCK_BIT_COUNT;
@@ -240,19 +110,6 @@ impl BitVec {
         }
     }
 
-    /// Returns the value at index `index`, or `None` if index is out of bounds.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use probabilistic_collections::bit_vec::BitVec;
-    ///
-    /// let mut bv = BitVec::new(5);
-    /// bv.set(1, true);
-    ///
-    /// assert_eq!(bv.get(0), Some(false));
-    /// assert_eq!(bv.get(1), Some(true));
-    /// ```
     pub fn get(&self, index: usize) -> Option<bool> {
         if index >= self.len {
             None
@@ -265,25 +122,6 @@ impl BitVec {
         }
     }
 
-    /// Sets all values in the `BitVec` to `bit`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if attempting to set a bit out-of-bounds.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use probabilistic_collections::bit_vec::BitVec;
-    ///
-    /// let mut bv = BitVec::from_elem(5, false);
-    /// bv.set_all(true);
-    ///
-    /// assert_eq!(
-    ///     bv.iter().collect::<Vec<bool>>(),
-    ///     vec![true, true, true, true, true],
-    /// );
-    /// ```
     pub fn set_all(&mut self, bit: bool) {
         let mask;
         if bit {
@@ -299,25 +137,6 @@ impl BitVec {
         self.clear_extra_bits();
     }
 
-    /// Flip the value at index `index`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if attempt to flip an index out-of-bounds.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use probabilistic_collections::bit_vec::BitVec;
-    ///
-    /// let mut bv = BitVec::from_elem(5, false);
-    ///
-    /// bv.flip(0);
-    /// assert_eq!(bv.get(0), Some(true));
-    ///
-    /// bv.flip(1);
-    /// assert_eq!(bv.get(0), Some(true));
-    /// ```
     pub fn flip(&mut self, index: usize) {
         assert!(index < self.len);
         let block_index = index / BLOCK_BIT_COUNT;
@@ -332,27 +151,6 @@ impl BitVec {
         }
     }
 
-    /// Flips all values in the `BitVec`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use probabilistic_collections::bit_vec::BitVec;
-    ///
-    /// let mut bv = BitVec::from_elem(5, false);
-    ///
-    /// bv.flip_all();
-    /// assert_eq!(
-    ///     bv.iter().collect::<Vec<bool>>(),
-    ///     vec![true, true, true, true, true],
-    /// );
-    ///
-    /// bv.flip_all();
-    /// assert_eq!(
-    ///     bv.iter().collect::<Vec<bool>>(),
-    ///     vec![false, false, false, false, false],
-    /// );
-    /// ```
     pub fn flip_all(&mut self) {
         self.one_count = self.len - self.one_count;
         for block in &mut self.blocks {
@@ -380,134 +178,22 @@ impl BitVec {
         }
     }
 
-    /// Sets `self` to the union of `self` and `other`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the two `BitVec` are of different lengths.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use probabilistic_collections::bit_vec::BitVec;
-    ///
-    /// let mut bv1 = BitVec::new(4);
-    /// bv1.set(0, true);
-    /// bv1.set(1, true);
-    ///
-    /// let mut bv2 = BitVec::new(4);
-    /// bv2.set(0, true);
-    /// bv2.set(2, true);
-    ///
-    /// bv1.union(&bv2);
-    /// assert_eq!(
-    ///     bv1.iter().collect::<Vec<bool>>(),
-    ///     vec![true, true, true, false],
-    /// );
-    /// ```
     pub fn union(&mut self, other: &Self) {
         self.apply(other, |x, y| x | y)
     }
 
-    /// Sets `self` to the intersection of `self` and `other`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the two `BitVec` are of different lengths.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use probabilistic_collections::bit_vec::BitVec;
-    ///
-    /// let mut bv1 = BitVec::new(4);
-    /// bv1.set(0, true);
-    /// bv1.set(1, true);
-    ///
-    /// let mut bv2 = BitVec::new(4);
-    /// bv2.set(0, true);
-    /// bv2.set(2, true);
-    ///
-    /// bv1.intersection(&bv2);
-    /// assert_eq!(
-    ///     bv1.iter().collect::<Vec<bool>>(),
-    ///     vec![true, false, false, false],
-    /// );
-    /// ```
     pub fn intersection(&mut self, other: &Self) {
         self.apply(other, |x, y| x & y)
     }
 
-    /// Sets `self` to the difference of `self` and `other`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the two `BitVec` are of different lengths.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use probabilistic_collections::bit_vec::BitVec;
-    ///
-    /// let mut bv1 = BitVec::new(4);
-    /// bv1.set(0, true);
-    /// bv1.set(1, true);
-    ///
-    /// let mut bv2 = BitVec::new(4);
-    /// bv2.set(0, true);
-    /// bv2.set(2, true);
-    ///
-    /// bv1.difference(&bv2);
-    /// assert_eq!(
-    ///     bv1.iter().collect::<Vec<bool>>(),
-    ///     vec![false, true, false, false],
-    /// );
-    /// ```
     pub fn difference(&mut self, other: &Self) {
         self.apply(other, |x, y| x & !y)
     }
 
-    /// Sets `self` to the symmetric difference of `self` and `other`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the two `BitVec` are of different lengths.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use probabilistic_collections::bit_vec::BitVec;
-    ///
-    /// let mut bv1 = BitVec::new(4);
-    /// bv1.set(0, true);
-    /// bv1.set(1, true);
-    ///
-    /// let mut bv2 = BitVec::new(4);
-    /// bv2.set(0, true);
-    /// bv2.set(2, true);
-    ///
-    /// bv1.symmetric_difference(&bv2);
-    /// assert_eq!(
-    ///     bv1.iter().collect::<Vec<bool>>(),
-    ///     vec![false, true, true, false],
-    /// );
-    /// ```
     pub fn symmetric_difference(&mut self, other: &Self) {
         self.apply(other, |x, y| (x & !y) | (!x & y))
     }
 
-    /// Truncates a `BitVec`, dropping excess elements.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use probabilistic_collections::bit_vec::BitVec;
-    ///
-    /// let mut bv = BitVec::from_elem(5, false);
-    ///
-    /// bv.truncate(2);
-    /// assert_eq!(bv.iter().collect::<Vec<bool>>(), vec![false, false]);
-    /// ```
     pub fn truncate(&mut self, len: usize) {
         if len < self.len {
             self.len = len;
@@ -516,21 +202,6 @@ impl BitVec {
         }
     }
 
-    /// Reserves capacity for at least `additional` more bits to be inserted in the given
-    /// `BitVec`.
-    ///
-    /// # Examples
-    ///
-    ///
-    /// ```
-    /// use probabilistic_collections::bit_vec::BitVec;
-    ///
-    /// let mut bv = BitVec::from_elem(5, false);
-    ///
-    /// bv.reserve(10);
-    /// assert_eq!(bv.len(), 5);
-    /// assert!(bv.capacity() >= 16);
-    /// ```
     pub fn reserve(&mut self, additional: usize) {
         let desired_cap = self.len + additional;
         if desired_cap > self.capacity() {
@@ -539,20 +210,6 @@ impl BitVec {
         }
     }
 
-    /// Reserves capacity for exactly `additional` more bits to be inserted in the given
-    /// `BitVec`.
-    ///
-    /// # Examples
-    ///
-    ///
-    /// ```
-    /// use probabilistic_collections::bit_vec::BitVec;
-    ///
-    /// let mut bv = BitVec::from_elem(5, false);
-    /// bv.reserve_exact(10);
-    /// assert_eq!(bv.len(), 5);
-    /// assert_eq!(bv.capacity(), 16);
-    /// ```
     pub fn reserve_exact(&mut self, additional: usize) {
         let desired_cap = self.len + additional;
         if desired_cap > self.capacity() {
@@ -561,19 +218,6 @@ impl BitVec {
         }
     }
 
-    /// Returns and removes the last element of the `BitVec`. Returns `None` if the `BitVec` is
-    /// empty.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use probabilistic_collections::bit_vec::BitVec;
-    ///
-    /// let mut bv = BitVec::from_elem(1, false);
-    ///
-    /// assert_eq!(bv.pop(), Some(false));
-    /// assert_eq!(bv.pop(), None);
-    /// ```
     pub fn pop(&mut self) -> Option<bool> {
         if self.is_empty() {
             None
@@ -589,18 +233,6 @@ impl BitVec {
         }
     }
 
-    /// Pushes an element into the `BitVec`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use probabilistic_collections::bit_vec::BitVec;
-    ///
-    /// let mut bv = BitVec::from_elem(1, false);
-    ///
-    /// bv.push(true);
-    /// assert_eq!(bv.get(1), Some(true));
-    /// ```
     pub fn push(&mut self, bit: bool) {
         if self.len % BLOCK_BIT_COUNT == 0 {
             self.blocks.push(0);
@@ -620,18 +252,6 @@ impl BitVec {
         self.blocks.iter_mut()
     }
 
-    /// Returns an iterator over the elements of the vector in order.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use probabilistic_collections::bit_vec::BitVec;
-    ///
-    /// let mut bv = BitVec::from_elem(1, false);
-    ///
-    /// bv.push(true);
-    /// assert_eq!(bv.iter().collect::<Vec<bool>>(), vec![false, true]);
-    /// ```
     pub fn iter(&self) -> BitVecIter<'_> {
         BitVecIter {
             bit_vec: self,
@@ -639,80 +259,22 @@ impl BitVec {
         }
     }
 
-    /// Returns `true` if the `BitVec` is empty.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use probabilistic_collections::bit_vec::BitVec;
-    ///
-    /// let mut bv = BitVec::from_elem(1, false);
-    ///
-    /// assert!(!bv.is_empty());
-    /// bv.pop();
-    /// assert!(bv.is_empty());
-    /// ```
     pub fn is_empty(&self) -> bool {
         self.len == 0
     }
 
-    /// Returns the number of elements in the `BitVec`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use probabilistic_collections::bit_vec::BitVec;
-    ///
-    /// let mut bv = BitVec::from_elem(1, false);
-    ///
-    /// assert_eq!(bv.len(), 1);
-    /// bv.pop();
-    /// assert_eq!(bv.len(), 0);
-    /// ```
     pub fn len(&self) -> usize {
         self.len
     }
 
-    /// Returns the capacity of the `BitVec`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use probabilistic_collections::bit_vec::BitVec;
-    ///
-    /// let mut bv = BitVec::new(0);
-    ///
-    /// bv.reserve_exact(10);
-    /// assert_eq!(bv.capacity(), 16);
-    /// ```
     pub fn capacity(&self) -> usize {
         self.blocks.capacity() * BLOCK_BIT_COUNT
     }
 
-    /// Returns the number of set bits in the `BitVec`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use probabilistic_collections::bit_vec::BitVec;
-    ///
-    /// let bv = BitVec::from_bytes(&[0b11010000]);
-    /// assert_eq!(bv.count_ones(), 3);
-    /// ```
     pub fn count_ones(&self) -> usize {
         self.one_count
     }
 
-    /// Returns the number of unset bits in the `BitVec`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use probabilistic_collections::bit_vec::BitVec;
-    ///
-    /// let bv = BitVec::from_bytes(&[0b11010000]);
-    /// assert_eq!(bv.count_zeros(), 5);
-    /// ```
     pub fn count_zeros(&self) -> usize {
         self.len - self.one_count
     }
@@ -733,9 +295,6 @@ impl Clone for BitVec {
     }
 }
 
-/// An owning iterator for `BitVec`.
-///
-/// This iterator yields bits in order.
 pub struct BitVecIter<'a> {
     bit_vec: &'a BitVec,
     range: Range<usize>,
@@ -760,9 +319,6 @@ impl<'a> IntoIterator for &'a BitVec {
     }
 }
 
-/// An iterator for `BitVec`.
-///
-/// This iterator yields bits in order.
 pub struct BitVecIntoIter {
     bit_vec: BitVec,
     range: Range<usize>,
