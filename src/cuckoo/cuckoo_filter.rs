@@ -1,4 +1,4 @@
-use crate::bit_array_vec::BitArrayVec;
+use crate::bitstring_vec::BitstringVec;
 use crate::cuckoo::{DEFAULT_ENTRIES_PER_INDEX, DEFAULT_FINGERPRINT_BIT_COUNT, DEFAULT_MAX_KICKS};
 use crate::SipHasherBuilder;
 use rand::{Rng, SeedableRng};
@@ -9,8 +9,6 @@ use std::borrow::Borrow;
 use std::cmp;
 use std::hash::{BuildHasher, Hash, Hasher};
 use std::marker::PhantomData;
-
-const EMPTY_FINGERPRINT: &[u8] = &[0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8];
 
 /// A space-efficient probabilistic data structure to test for membership in a set. Cuckoo filters
 /// also provide the flexibility to remove items.
@@ -47,7 +45,7 @@ const EMPTY_FINGERPRINT: &[u8] = &[0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8];
 pub struct CuckooFilter<T, B = SipHasherBuilder> {
     max_kicks: usize,
     entries_per_index: usize,
-    fingerprint_vec: BitArrayVec,
+    fingerprint_vec: BitstringVec,
     pub(super) extra_items: Vec<(u64, usize)>,
     hash_builders: [B; 2],
     #[cfg_attr(feature = "serde", serde(skip, default = "XorShiftRng::from_entropy"))]
@@ -218,7 +216,7 @@ where
         CuckooFilter {
             max_kicks: DEFAULT_MAX_KICKS,
             entries_per_index: DEFAULT_ENTRIES_PER_INDEX,
-            fingerprint_vec: BitArrayVec::new(
+            fingerprint_vec: BitstringVec::new(
                 DEFAULT_FINGERPRINT_BIT_COUNT,
                 bucket_len * DEFAULT_ENTRIES_PER_INDEX,
             ),
@@ -272,7 +270,7 @@ where
         CuckooFilter {
             max_kicks: DEFAULT_MAX_KICKS,
             entries_per_index,
-            fingerprint_vec: BitArrayVec::new(
+            fingerprint_vec: BitstringVec::new(
                 fingerprint_bit_count,
                 bucket_len * entries_per_index,
             ),
@@ -322,7 +320,7 @@ where
         CuckooFilter {
             max_kicks: DEFAULT_MAX_KICKS,
             entries_per_index,
-            fingerprint_vec: BitArrayVec::new(
+            fingerprint_vec: BitstringVec::new(
                 fingerprint_bit_count,
                 bucket_len * entries_per_index,
             ),
@@ -375,7 +373,7 @@ where
         CuckooFilter {
             max_kicks: DEFAULT_MAX_KICKS,
             entries_per_index,
-            fingerprint_vec: BitArrayVec::new(
+            fingerprint_vec: BitstringVec::new(
                 fingerprint_bit_count,
                 bucket_len * entries_per_index,
             ),
@@ -386,26 +384,12 @@ where
         }
     }
 
-    pub(super) fn get_fingerprint(raw_fingerprint: u64) -> Vec<u8> {
-        (0..8)
-            .map(|index| ((raw_fingerprint >> (index * 8)) & (0xFF)) as u8)
-            .collect()
-    }
-
-    fn get_raw_fingerprint(fingerprint: &[u8]) -> u64 {
-        let mut ret = 0u64;
-        for (index, byte) in fingerprint.iter().enumerate() {
-            ret |= (u64::from(*byte)) << (index * 8)
-        }
-        ret
-    }
-
     #[inline]
     fn get_vec_index(&self, index: usize, bucket_index: usize) -> usize {
         index * self.entries_per_index + bucket_index
     }
 
-    fn get_fingerprint_and_indexes<U>(&self, item: &U) -> (Vec<u8>, usize, usize)
+    fn get_fingerprint_and_indexes<U>(&self, item: &U) -> (u64, usize, usize)
     where
         T: Borrow<U>,
         U: Hash + ?Sized,
@@ -414,23 +398,22 @@ where
         let mut hasher = self.hash_builders[0].build_hasher();
         item.hash(&mut hasher);
         let mut h0 = hasher.finish();
-        let mut raw_fingerprint = h0 << trailing_zeros >> trailing_zeros;
+        let mut fingerprint = h0 << trailing_zeros >> trailing_zeros;
 
         // rehash when fingerprint is all 0s
-        while raw_fingerprint == 0 {
+        while fingerprint == 0 {
             let mut hasher = self.hash_builders[0].build_hasher();
-            h0.hash(&mut hasher);
+            h0.wrapping_add(1).hash(&mut hasher);
             h0 = hasher.finish();
-            raw_fingerprint = h0 << trailing_zeros >> trailing_zeros;
+            fingerprint = h0 << trailing_zeros >> trailing_zeros;
         }
-        let fingerprint = Self::get_fingerprint(raw_fingerprint);
 
         let mut hasher = self.hash_builders[1].build_hasher();
         item.hash(&mut hasher);
         let h1 = hasher.finish();
 
         let index_1 = h1 as usize % self.bucket_len();
-        let index_2 = (index_1 ^ raw_fingerprint as usize) % self.bucket_len();
+        let index_2 = (index_1 ^ fingerprint as usize) % self.bucket_len();
         (fingerprint, index_1, index_2)
     }
 
@@ -450,12 +433,12 @@ where
         U: Hash + ?Sized,
     {
         let (mut fingerprint, index_1, index_2) = self.get_fingerprint_and_indexes(item);
-        if !self.contains_fingerprint(&fingerprint, index_1, index_2) {
-            if self.insert_fingerprint(fingerprint.as_slice(), index_1) {
+        if !self.contains_fingerprint(fingerprint, index_1, index_2) {
+            if self.insert_fingerprint(fingerprint, index_1) {
                 return;
             }
 
-            if self.insert_fingerprint(fingerprint.as_slice(), index_2) {
+            if self.insert_fingerprint(fingerprint, index_2) {
                 return;
             }
 
@@ -471,33 +454,26 @@ where
                 let bucket_index = self.rng.gen_range(0, self.entries_per_index);
                 let vec_index = self.get_vec_index(index, bucket_index);
                 let new_fingerprint = self.fingerprint_vec.get(vec_index);
-                self.fingerprint_vec.set(vec_index, fingerprint.as_slice());
+                self.fingerprint_vec.set(vec_index, fingerprint);
                 fingerprint = new_fingerprint;
                 prev_index = index;
-                index = prev_index ^ Self::get_raw_fingerprint(&fingerprint) as usize;
+                index = prev_index ^ fingerprint as usize;
                 index %= self.bucket_len();
-                if self.insert_fingerprint(fingerprint.as_slice(), index) {
+                if self.insert_fingerprint(fingerprint, index) {
                     return;
                 }
             }
 
-            self.extra_items.push((
-                Self::get_raw_fingerprint(&fingerprint),
-                cmp::min(prev_index, index),
-            ));
+            self.extra_items
+                .push((fingerprint, cmp::min(prev_index, index)));
         }
     }
 
-    pub(super) fn insert_fingerprint(&mut self, fingerprint: &[u8], index: usize) -> bool {
+    pub(super) fn insert_fingerprint(&mut self, fingerprint: u64, index: usize) -> bool {
         let entries_per_index = self.entries_per_index;
         for bucket_index in 0..entries_per_index {
             let vec_index = self.get_vec_index(index, bucket_index);
-            let is_empty = self
-                .fingerprint_vec
-                .get(vec_index)
-                .iter()
-                .all(|byte| *byte == 0);
-
+            let is_empty = self.fingerprint_vec.get(vec_index) == 0;
             if is_empty {
                 self.fingerprint_vec.set(vec_index, fingerprint);
                 return true;
@@ -527,30 +503,29 @@ where
         U: Hash + ?Sized,
     {
         let (fingerprint, index_1, index_2) = self.get_fingerprint_and_indexes(item);
-        self.remove_fingerprint(&fingerprint, index_1, index_2)
+        self.remove_fingerprint(fingerprint, index_1, index_2)
     }
 
-    fn remove_fingerprint(&mut self, fingerprint: &[u8], index_1: usize, index_2: usize) {
-        let raw_fingerprint = Self::get_raw_fingerprint(fingerprint);
+    fn remove_fingerprint(&mut self, fingerprint: u64, index_1: usize, index_2: usize) {
         let min_index = cmp::min(index_1, index_2);
         let entries_per_index = self.entries_per_index;
         if let Some(index) = self
             .extra_items
             .iter()
-            .position(|item| *item == (raw_fingerprint, min_index))
+            .position(|item| *item == (fingerprint, min_index))
         {
             self.extra_items.swap_remove(index);
         }
         for bucket_index in 0..entries_per_index {
             let vec_index_1 = self.get_vec_index(index_1, bucket_index);
-            let fingerprint_1 = &self.fingerprint_vec.get(vec_index_1);
-            if Self::get_raw_fingerprint(fingerprint_1) == raw_fingerprint {
-                self.fingerprint_vec.set(vec_index_1, EMPTY_FINGERPRINT);
+            let fingerprint_1 = self.fingerprint_vec.get(vec_index_1);
+            if fingerprint_1 == fingerprint {
+                self.fingerprint_vec.set(vec_index_1, 0);
             } else {
                 let vec_index_2 = self.get_vec_index(index_2, bucket_index);
-                let fingerprint_2 = &self.fingerprint_vec.get(vec_index_2);
-                if Self::get_raw_fingerprint(fingerprint_2) == raw_fingerprint {
-                    self.fingerprint_vec.set(vec_index_2, EMPTY_FINGERPRINT);
+                let fingerprint_2 = self.fingerprint_vec.get(vec_index_2);
+                if fingerprint_2 == fingerprint {
+                    self.fingerprint_vec.set(vec_index_2, 0);
                 }
             }
         }
@@ -574,30 +549,20 @@ where
         U: Hash + ?Sized,
     {
         let (fingerprint, index_1, index_2) = self.get_fingerprint_and_indexes(item);
-        self.contains_fingerprint(&fingerprint, index_1, index_2)
+        self.contains_fingerprint(fingerprint, index_1, index_2)
     }
 
-    fn contains_fingerprint(&self, fingerprint: &[u8], index_1: usize, index_2: usize) -> bool {
-        let raw_fingerprint = Self::get_raw_fingerprint(fingerprint);
+    fn contains_fingerprint(&self, fingerprint: u64, index_1: usize, index_2: usize) -> bool {
         let min_index = cmp::min(index_1, index_2);
         let entries_per_index = self.entries_per_index;
-        if self.extra_items.contains(&(raw_fingerprint, min_index)) {
+        if self.extra_items.contains(&(fingerprint, min_index)) {
             return true;
         }
         (0..entries_per_index).any(|bucket_index| {
             let vec_index_1 = self.get_vec_index(index_1, bucket_index);
             let vec_index_2 = self.get_vec_index(index_2, bucket_index);
-            self.fingerprint_vec
-                .get(vec_index_1)
-                .iter()
-                .zip(fingerprint)
-                .all(|pair| pair.0 == pair.1)
-                || self
-                    .fingerprint_vec
-                    .get(vec_index_2)
-                    .iter()
-                    .zip(fingerprint)
-                    .all(|pair| pair.0 == pair.1)
+            self.fingerprint_vec.get(vec_index_1) == fingerprint
+                || self.fingerprint_vec.get(vec_index_2) == fingerprint
         })
     }
 
@@ -679,7 +644,7 @@ where
     /// assert_eq!(filter.bucket_len(), 32);
     /// ```
     pub fn bucket_len(&self) -> usize {
-        self.fingerprint_vec.capacity() / self.entries_per_index
+        self.fingerprint_vec.len() / self.entries_per_index
     }
 
     /// Returns the number of entries per index in the cuckoo filter.
@@ -804,24 +769,6 @@ impl<T> PartialEq for CuckooFilter<T> {
 mod tests {
     use super::CuckooFilter;
     use crate::util::tests::{hash_builder_1, hash_builder_2};
-
-    #[test]
-    fn test_get_fingerprint() {
-        let fingerprint = CuckooFilter::<String>::get_fingerprint(0x7FBF_DFEF_F7FB_FDFE);
-        assert_eq!(
-            CuckooFilter::<String>::get_raw_fingerprint(&fingerprint),
-            0x7FBF_DFEF_F7FB_FDFE,
-        );
-    }
-
-    #[test]
-    fn test_get_raw_fingerprint() {
-        let fingerprint = vec![0xFF, 0xFF];
-        assert_eq!(
-            CuckooFilter::<String>::get_raw_fingerprint(&fingerprint),
-            0xFFFF,
-        );
-    }
 
     #[test]
     fn test_new() {

@@ -1,5 +1,6 @@
 //! Space-efficient probabilistic data structure for approximate membership queries in a set.
 
+use crate::bitstring_vec::BitstringVec;
 use crate::SipHasherBuilder;
 #[cfg(feature = "serde")]
 use serde_crate::{Deserialize, Serialize};
@@ -60,11 +61,9 @@ pub struct QuotientFilter<T, B = SipHasherBuilder> {
     // ||- is_shifted: is set when remainder is in this slot that is not its canonical slot
     // |-- is_continuation: is set when this slot is occupied by not the first remainder in a run
     // --- is_occupied: is set when this slot is canonical slot for some key in quotient filter
-    slot_bits: u8,
     quotient_mask: u64,
     remainder_mask: u64,
-    slot_mask: u64,
-    table: Vec<u64>,
+    slot_vec: BitstringVec,
     hash_builder: B,
     len: usize,
     _marker: PhantomData<T>,
@@ -156,40 +155,12 @@ where
         }
     }
 
-    fn get_slot(&self, index: usize) -> u64 {
-        let mut slot = 0;
-        let bit_offset = self.slot_bits as usize * index;
-        let table_index = bit_offset / 64;
-        let bit_index = bit_offset % 64;
-        let bits_left = self.slot_bits as isize - (64 - bit_index as isize);
-        slot |= (self.table[table_index] >> bit_index) & self.slot_mask;
-        if bits_left > 0 {
-            let offset = self.slot_bits - bits_left as u8;
-            slot |= (self.table[table_index + 1] & Self::get_mask(bits_left as u8)) << offset;
-        }
-        slot
-    }
-
-    fn set_slot(&mut self, index: usize, slot: u64) {
-        let bit_offset = self.slot_bits as usize * index;
-        let table_index = bit_offset / 64;
-        let bit_index = bit_offset % 64;
-        let bits_left = self.slot_bits as isize - (64 - bit_index as isize);
-        self.table[table_index] &= !(self.slot_mask << bit_index);
-        self.table[table_index] |= slot << bit_index;
-        if bits_left > 0 {
-            let offset = self.slot_bits - bits_left as u8;
-            self.table[table_index + 1] &= !Self::get_mask(bits_left as u8);
-            self.table[table_index + 1] |= slot >> offset;
-        }
-    }
-
     // returns (index of run start, # of runs from cluster start, # of occupied slots)
     fn get_run_start(&self, mut index: usize) -> (usize, usize, usize) {
         // find start of cluster
         let mut occupied_count = 0;
         loop {
-            let slot = self.get_slot(index);
+            let slot = self.slot_vec.get(index);
             if slot & OCCUPIED_MASK != 0 {
                 occupied_count += 1;
             }
@@ -204,7 +175,7 @@ where
         let mut runs_count = 0;
         let mut total_occupied_count = 0;
         loop {
-            let slot = self.get_slot(index);
+            let slot = self.slot_vec.get(index);
             if slot & OCCUPIED_MASK != 0 {
                 total_occupied_count += 1;
             }
@@ -225,7 +196,7 @@ where
         let mut curr_slot = slot;
 
         loop {
-            let mut next_slot = self.get_slot(index);
+            let mut next_slot = self.slot_vec.get(index);
             let is_empty_slot = next_slot & METADATA_MASK == 0;
 
             // transfer occupied bit since they stay with the index
@@ -234,7 +205,7 @@ where
                 curr_slot |= OCCUPIED_MASK;
             }
 
-            self.set_slot(index, curr_slot);
+            self.slot_vec.set(index, curr_slot);
             curr_slot = next_slot;
             self.increment_index(&mut index);
 
@@ -269,15 +240,13 @@ where
         assert!(remainder_bits > 0);
         assert!(quotient_bits + remainder_bits <= 64);
         let slot_bits = remainder_bits + METADATA_BITS;
-        let table_len = ((u64::from(slot_bits) * (1u64 << quotient_bits)) as usize + 63) / 64;
+        let slot_vec_len = u64::from(slot_bits) * (1u64 << quotient_bits);
         QuotientFilter {
             quotient_bits,
             remainder_bits,
-            slot_bits,
             quotient_mask: Self::get_mask(quotient_bits),
             remainder_mask: Self::get_mask(remainder_bits),
-            slot_mask: Self::get_mask(slot_bits),
-            table: vec![0; table_len],
+            slot_vec: BitstringVec::new(slot_bits as usize, slot_vec_len as usize),
             hash_builder,
             len: 0,
             _marker: PhantomData,
@@ -332,11 +301,12 @@ where
         U: Hash + ?Sized,
     {
         let (quotient, remainder) = self.get_quotient_and_remainder(self.get_hash(item));
-        let slot = self.get_slot(quotient);
+        let slot = self.slot_vec.get(quotient);
 
         // empty slot
         if slot & METADATA_MASK == 0 {
-            self.set_slot(quotient, (remainder << METADATA_BITS) | OCCUPIED_MASK);
+            self.slot_vec
+                .set(quotient, (remainder << METADATA_BITS) | OCCUPIED_MASK);
             self.len += 1;
             return;
         }
@@ -352,7 +322,7 @@ where
         // the new run
         let new_run = {
             if slot & OCCUPIED_MASK == 0 {
-                self.set_slot(quotient, slot | OCCUPIED_MASK);
+                self.slot_vec.set(quotient, slot | OCCUPIED_MASK);
                 true
             } else {
                 false
@@ -363,7 +333,7 @@ where
         let (mut index, ..) = self.get_run_start(quotient);
         let run_start = index;
         let mut new_slot = remainder << METADATA_BITS;
-        let mut slot = self.get_slot(index);
+        let mut slot = self.slot_vec.get(index);
 
         if !new_run {
             // find position to insert
@@ -374,7 +344,7 @@ where
                 }
 
                 self.increment_index(&mut index);
-                slot = self.get_slot(index);
+                slot = self.slot_vec.get(index);
 
                 // end of run
                 if slot & CONTINUATION_MASK == 0 {
@@ -384,9 +354,9 @@ where
 
             // new position is start of run
             if index == run_start {
-                let mut run_start_slot = self.get_slot(run_start);
+                let mut run_start_slot = self.slot_vec.get(run_start);
                 run_start_slot |= CONTINUATION_MASK;
-                self.set_slot(run_start, run_start_slot);
+                self.slot_vec.set(run_start, run_start_slot);
             } else {
                 new_slot |= CONTINUATION_MASK;
             }
@@ -420,7 +390,7 @@ where
         U: Hash + ?Sized,
     {
         let (quotient, remainder) = self.get_quotient_and_remainder(self.get_hash(item));
-        let slot = self.get_slot(quotient);
+        let slot = self.slot_vec.get(quotient);
 
         // no such run exists
         if slot & OCCUPIED_MASK == 0 {
@@ -437,7 +407,7 @@ where
 
         let (mut index, ..) = self.get_run_start(quotient);
 
-        let mut slot = self.get_slot(index);
+        let mut slot = self.slot_vec.get(index);
         loop {
             match (slot >> METADATA_BITS).cmp(&remainder) {
                 Ordering::Equal => return true,
@@ -445,7 +415,7 @@ where
                 Ordering::Greater => return false,
                 Ordering::Less => {
                     self.increment_index(&mut index);
-                    slot = self.get_slot(index);
+                    slot = self.slot_vec.get(index);
 
                     // end of run
                     if slot & CONTINUATION_MASK == 0 {
@@ -478,12 +448,12 @@ where
         let (quotient, remainder) = self.get_quotient_and_remainder(self.get_hash(item));
 
         // empty slot
-        if self.get_slot(quotient) & METADATA_MASK == 0 {
+        if self.slot_vec.get(quotient) & METADATA_MASK == 0 {
             return;
         }
 
         let (mut index, mut runs_count, mut occupied_count) = self.get_run_start(quotient);
-        let mut slot = self.get_slot(index);
+        let mut slot = self.slot_vec.get(index);
         loop {
             match (slot >> METADATA_BITS).cmp(&remainder) {
                 Ordering::Equal => break,
@@ -491,7 +461,7 @@ where
                 Ordering::Greater => return,
                 Ordering::Less => {
                     self.increment_index(&mut index);
-                    slot = self.get_slot(index);
+                    slot = self.slot_vec.get(index);
 
                     if slot & OCCUPIED_MASK != 0 {
                         occupied_count += 1;
@@ -510,24 +480,24 @@ where
 
         // keep occupied bit only, if it exists
         slot &= OCCUPIED_MASK;
-        self.set_slot(index, 0);
+        self.slot_vec.set(index, 0);
 
         let mut next_index = index;
         self.increment_index(&mut next_index);
-        let mut next_slot = self.get_slot(next_index);
+        let mut next_slot = self.slot_vec.get(next_index);
 
         // continue until it is not shifted and not a continuation: the only cases are if it is an
         // item in its canonical position, or if the slot is empty
         while next_slot & CONTINUATION_MASK != 0 || next_slot & SHIFTED_MASK != 0 {
-            self.set_slot(next_index, 0);
+            self.slot_vec.set(next_index, 0);
 
             // update number of runs since the entire run gets shifted to left
             if next_slot & CONTINUATION_MASK == 0 {
                 runs_count += 1;
                 // next slot is a new run, so we can delete occupied bit of canonical position
                 if is_run_start {
-                    let canonical_slot = self.get_slot(quotient) & !OCCUPIED_MASK;
-                    self.set_slot(quotient, canonical_slot);
+                    let canonical_slot = self.slot_vec.get(quotient) & !OCCUPIED_MASK;
+                    self.slot_vec.set(quotient, canonical_slot);
                 }
             }
             // if first item is a start of a run, the next item must be a start of a run. The
@@ -545,7 +515,7 @@ where
             }
 
             slot |= next_slot & !METADATA_MASK;
-            self.set_slot(index, slot);
+            self.slot_vec.set(index, slot);
 
             // update occupied count since occupied bit does not get shifted
             if next_slot & OCCUPIED_MASK != 0 {
@@ -557,7 +527,7 @@ where
 
             index = next_index;
             self.increment_index(&mut next_index);
-            next_slot = self.get_slot(next_index);
+            next_slot = self.slot_vec.get(next_index);
         }
 
         self.len -= 1;
@@ -578,9 +548,7 @@ where
     /// assert!(!filter.contains("foo"));
     /// ```
     pub fn clear(&mut self) {
-        for value in &mut self.table {
-            *value = 0;
-        }
+        self.slot_vec.clear();
         self.len = 0;
     }
 
@@ -699,7 +667,7 @@ use std::fmt;
 impl<T> fmt::Debug for QuotientFilter<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for i in 0..self.capacity() {
-            let slot = self.get_slot(i);
+            let slot = self.slot_vec.get(i);
             write!(f, "{}|{}:{:03b} ", i, slot >> 3, slot & METADATA_MASK)?;
         }
         Ok(())
@@ -833,11 +801,9 @@ mod tests {
         assert!(de_filter.contains("foo"));
         assert_eq!(filter.quotient_bits(), de_filter.quotient_bits());
         assert_eq!(filter.remainder_bits(), de_filter.remainder_bits());
-        assert_eq!(filter.slot_bits, de_filter.slot_bits);
         assert_eq!(filter.quotient_mask, de_filter.quotient_mask);
         assert_eq!(filter.remainder_mask, de_filter.remainder_mask);
-        assert_eq!(filter.slot_mask, de_filter.slot_mask);
-        assert_eq!(filter.table, de_filter.table);
+        assert_eq!(filter.slot_vec, de_filter.slot_vec);
         assert_eq!(filter.len(), de_filter.len());
         assert_eq!(filter.hasher(), de_filter.hasher());
     }
