@@ -1,13 +1,14 @@
 //! Space-efficient probabilistic data structure for approximate membership queries in a set.
 
 use crate::bitstring_vec::BitstringVec;
+use crate::util;
 use crate::SipHasherBuilder;
 #[cfg(feature = "serde")]
 use serde_crate::{Deserialize, Serialize};
 use std::borrow::Borrow;
 use std::cmp::Ordering;
 use std::f64::consts;
-use std::hash::{BuildHasher, Hash, Hasher};
+use std::hash::{BuildHasher, Hash};
 use std::marker::PhantomData;
 
 const SHIFTED_MASK: u64 = 0b001;
@@ -118,16 +119,6 @@ impl<T, B> QuotientFilter<T, B>
 where
     B: BuildHasher,
 {
-    fn get_hash<U>(&self, item: &U) -> u64
-    where
-        T: Borrow<U>,
-        U: Hash + ?Sized,
-    {
-        let mut hasher = self.hash_builder.build_hasher();
-        item.hash(&mut hasher);
-        hasher.finish()
-    }
-
     fn get_mask(size: u8) -> u64 {
         (1u64 << size) - 1
     }
@@ -300,7 +291,8 @@ where
         T: Borrow<U>,
         U: Hash + ?Sized,
     {
-        let (quotient, remainder) = self.get_quotient_and_remainder(self.get_hash(item));
+        let (quotient, remainder) =
+            self.get_quotient_and_remainder(util::hash(&self.hash_builder, &item));
         let slot = self.slot_vec.get(quotient);
 
         // empty slot
@@ -389,7 +381,8 @@ where
         T: Borrow<U>,
         U: Hash + ?Sized,
     {
-        let (quotient, remainder) = self.get_quotient_and_remainder(self.get_hash(item));
+        let (quotient, remainder) =
+            self.get_quotient_and_remainder(util::hash(&self.hash_builder, &item));
         let slot = self.slot_vec.get(quotient);
 
         // no such run exists
@@ -445,7 +438,8 @@ where
         T: Borrow<U>,
         U: Hash + ?Sized,
     {
-        let (quotient, remainder) = self.get_quotient_and_remainder(self.get_hash(item));
+        let (quotient, remainder) =
+            self.get_quotient_and_remainder(util::hash(&self.hash_builder, &item));
 
         // empty slot
         if self.slot_vec.get(quotient) & METADATA_MASK == 0 {

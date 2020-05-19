@@ -1,9 +1,10 @@
+use crate::util;
 use crate::SipHasherBuilder;
 #[cfg(feature = "serde")]
 use serde_crate::{Deserialize, Serialize};
 use std::cmp;
 use std::collections::HashSet;
-use std::hash::{BuildHasher, Hash, Hasher};
+use std::hash::{BuildHasher, Hash};
 use std::iter::FromIterator;
 use std::marker::PhantomData;
 
@@ -67,16 +68,6 @@ where
     T: Iterator<Item = U>,
     B: BuildHasher,
 {
-    fn get_hash(&self, item: &U) -> u64
-    where
-        U: Hash,
-        B: BuildHasher,
-    {
-        let mut hasher = self.hash_builder.build_hasher();
-        item.hash(&mut hasher);
-        hasher.finish()
-    }
-
     /// Constructs a new `SimHash` with a specified hasher builder.
     ///
     /// # Examples
@@ -119,7 +110,7 @@ where
         U: Hash,
     {
         let mut counts = [0i64; 64];
-        for hash in iter.map(|item| self.get_hash(&item)) {
+        for hash in iter.map(|item| util::hash(&self.hash_builder, &item)) {
             for (i, count) in counts.iter_mut().enumerate() {
                 if (hash >> i) & 1 == 0 {
                     *count += 1;

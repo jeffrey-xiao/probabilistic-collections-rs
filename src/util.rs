@@ -114,13 +114,9 @@ where
         T: Borrow<U>,
         U: Hash + ?Sized,
     {
-        let mut hasher_1 = self.hash_builders[0].build_hasher();
-        let mut hasher_2 = self.hash_builders[1].build_hasher();
-        item.hash(&mut hasher_1);
-        item.hash(&mut hasher_2);
         HashIter {
-            a: hasher_1.finish(),
-            b: hasher_2.finish(),
+            a: hash(&self.hash_builders[0], &item),
+            b: hash(&self.hash_builders[1], &item),
             c: 0,
         }
     }
@@ -128,6 +124,12 @@ where
     pub fn hashers(&self) -> &[B; 2] {
         &self.hash_builders
     }
+}
+
+pub fn hash(hash_builder: &impl BuildHasher, item: &impl Hash) -> u64 {
+    let mut hasher = hash_builder.build_hasher();
+    item.hash(&mut hasher);
+    hasher.finish()
 }
 
 #[derive(Clone, Copy)]

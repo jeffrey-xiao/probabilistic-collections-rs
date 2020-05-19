@@ -1,6 +1,7 @@
 //! Space-efficient probabilistic data structure for estimating the number of distinct items in a
 //! multiset.
 
+use crate::util;
 use crate::SipHasherBuilder;
 #[cfg(feature = "serde")]
 use serde_crate::{Deserialize, Serialize};
@@ -9,7 +10,7 @@ use std::cmp;
 use std::f64;
 use std::fmt::Debug;
 use std::hash::BuildHasher;
-use std::hash::{Hash, Hasher};
+use std::hash::Hash;
 use std::marker::PhantomData;
 
 /// A space-efficient probabilitic data structure to count the number of distinct items in a
@@ -128,9 +129,7 @@ where
         T: Borrow<U>,
         U: Hash + ?Sized,
     {
-        let mut hasher = self.hash_builder.build_hasher();
-        item.hash(&mut hasher);
-        let hash = hasher.finish();
+        let hash = util::hash(&self.hash_builder, &item);
         let register_index = hash as usize & (self.registers.len() - 1);
         let value = (!hash >> self.p).trailing_zeros() as u8;
         self.registers[register_index] = cmp::max(self.registers[register_index], value + 1);
