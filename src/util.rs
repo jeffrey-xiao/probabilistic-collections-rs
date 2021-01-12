@@ -9,12 +9,12 @@ use std::marker::PhantomData;
 use std::{cmp, fmt};
 
 /// The default hash builder for all collections.
+#[derive(Clone, Copy)]
 #[cfg_attr(
     feature = "serde",
     derive(Deserialize, Serialize),
     serde(crate = "serde_crate")
 )]
-#[derive(Clone, Copy)]
 pub struct SipHasherBuilder {
     k0: u64,
     k1: u64,
@@ -78,12 +78,12 @@ impl BuildHasher for SipHasherBuilder {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(
     feature = "serde",
     derive(Deserialize, Serialize),
     serde(crate = "serde_crate")
 )]
-#[derive(Debug, PartialEq)]
 pub struct DoubleHasher<T, B = SipHasherBuilder> {
     hash_builders: [B; 2],
     _marker: PhantomData<T>,

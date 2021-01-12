@@ -31,6 +31,7 @@ use std::hash::{BuildHasher, Hash};
 /// assert_eq!(filter.len(), 100);
 /// assert_eq!(filter.filter_count(), 1);
 /// ```
+#[derive(Clone)]
 #[cfg_attr(
     feature = "serde",
     derive(Deserialize, Serialize),

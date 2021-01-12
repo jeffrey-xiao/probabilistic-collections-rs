@@ -33,6 +33,7 @@ use std::marker::PhantomData;
 /// assert_eq!(filter.bit_count(), 10);
 /// assert_eq!(filter.hasher_count(), 7);
 /// ```
+#[derive(Clone)]
 #[cfg_attr(
     feature = "serde",
     derive(Deserialize, Serialize),
@@ -329,6 +330,7 @@ where
 /// assert_eq!(filter.bit_count(), 10);
 /// assert_eq!(filter.hasher_count(), 7);
 /// ```
+#[derive(Clone)]
 #[cfg_attr(
     feature = "serde",
     derive(Deserialize, Serialize),
@@ -626,6 +628,7 @@ where
 /// assert_eq!(filter.bit_count(), 10);
 /// assert_eq!(filter.hasher_count(), 7);
 /// ```
+#[derive(Clone)]
 #[cfg_attr(
     feature = "serde",
     derive(Deserialize, Serialize),

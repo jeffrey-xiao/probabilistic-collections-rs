@@ -6,7 +6,7 @@ use std::iter;
 use std::mem;
 use std::ops::Range;
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(
     feature = "serde",
     derive(Deserialize, Serialize),

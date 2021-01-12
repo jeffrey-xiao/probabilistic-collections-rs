@@ -32,7 +32,7 @@ use std::marker::PhantomData;
 /// assert_eq!(filter.len(), 96);
 /// assert_eq!(filter.hasher_count(), 7);
 /// ```
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(
     feature = "serde",
     derive(Deserialize, Serialize),

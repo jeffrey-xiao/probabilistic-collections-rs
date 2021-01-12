@@ -35,6 +35,7 @@ use std::marker::PhantomData;
 ///     0b0000_0101_0011_1000_0001_1111_1111_1000_0111_1011_0011_0001_1010_0001_0000_0110,
 /// );
 /// ```
+#[derive(Clone)]
 #[cfg_attr(
     feature = "serde",
     derive(Deserialize, Serialize),

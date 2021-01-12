@@ -88,6 +88,7 @@ impl CountStrategy for CountMedianBiasStrategy {
 /// assert!(count_min_sketch.confidence() <= 0.1);
 /// assert!(count_min_sketch.error() <= 0.05);
 /// ```
+#[derive(Clone)]
 #[cfg_attr(
     feature = "serde",
     derive(Deserialize, Serialize),

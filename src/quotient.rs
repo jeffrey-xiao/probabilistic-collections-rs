@@ -48,6 +48,7 @@ const METADATA_BITS: u8 = 3;
 /// assert_eq!(filter.quotient_bits(), 8);
 /// assert_eq!(filter.remainder_bits(), 4);
 /// ```
+#[derive(Clone)]
 #[cfg_attr(
     feature = "serde",
     derive(Deserialize, Serialize),

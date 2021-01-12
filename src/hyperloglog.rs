@@ -39,6 +39,7 @@ use std::marker::PhantomData;
 ///
 /// assert!((hhl.len().round() - 3.0).abs() < EPSILON);
 /// ```
+#[derive(Clone)]
 #[cfg_attr(
     feature = "serde",
     derive(Deserialize, Serialize),

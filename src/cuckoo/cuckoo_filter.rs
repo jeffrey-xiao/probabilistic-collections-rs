@@ -43,7 +43,7 @@ struct FingerprintAndIndexes {
 /// assert_eq!(filter.bucket_len(), 32);
 /// assert_eq!(filter.fingerprint_bit_count(), 8);
 /// ```
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 #[cfg_attr(
     feature = "serde",
     derive(Deserialize, Serialize),
