@@ -40,6 +40,19 @@
 //!
 //! Add this to your crate root if you are using Rust 2015:
 //!
+//! ## Caveats
+//!
+//! If you are using this crate to create collections to be used across different platforms, you
+//! must be careful not to use keys of type `[T]`. The Rust standard library implementation of
+//! `Hash` for `[T]` first hashes the length of the slice, then the contents of the slice. The
+//! length is platform specific because it is of type `usize`. Therefore, a collection with keys of
+//! type `[T]` will have unexpected results when used across platforms. For example, if you were to
+//! generate and serilize a `BloomFilter` on i686 compiled code where the keys are of type `[u8]`,
+//! the filter will not have the correct results when deserialized on x86_64 compiled code.
+//!
+//! The recommended work-around to this problem is to a define a wrapper struct around a `[T]`
+//! with a `Hash` implementation that only hashes the contents of the slice.
+//!
 //! ```rust
 //! extern crate probabilistic_collections;
 //! ```
