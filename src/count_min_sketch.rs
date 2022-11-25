@@ -376,7 +376,7 @@ where
     /// let hashers = count_min_sketch.hashers();
     /// ```
     pub fn hashers(&self) -> &[B; 2] {
-        &self.hasher.hashers()
+        self.hasher.hashers()
     }
 }
 

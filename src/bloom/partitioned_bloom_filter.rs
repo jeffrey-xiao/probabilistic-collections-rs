@@ -120,8 +120,9 @@ where
         hash_builders: [B; 2],
     ) -> Self {
         let hasher_count = Self::get_hasher_count(fpp);
-        let bit_count = (item_count as f64 * fpp.ln() / -2f64.ln().powi(2) / (hasher_count as f64))
-            .ceil() as usize;
+        let bit_count =
+            (item_count as f64 * fpp.ln() / -(2f64.ln().powi(2)) / (hasher_count as f64)).ceil()
+                as usize;
         PartitionedBloomFilter {
             bit_vec: BitVec::new(bit_count * hasher_count),
             hasher: DoubleHasher::with_hashers(hash_builders),
@@ -365,7 +366,7 @@ where
     /// let hashers = filter.hashers();
     /// ```
     pub fn hashers(&self) -> &[B; 2] {
-        &self.hasher.hashers()
+        self.hasher.hashers()
     }
 }
 

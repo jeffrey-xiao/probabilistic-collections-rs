@@ -168,15 +168,7 @@ where
         let matches: u64 = min_hashes_1
             .iter()
             .zip(min_hashes_2.iter())
-            .map(
-                |(min_hash_1, min_hash_2)| {
-                    if min_hash_1 == min_hash_2 {
-                        1
-                    } else {
-                        0
-                    }
-                },
-            )
+            .map(|(min_hash_1, min_hash_2)| u64::from(min_hash_1 == min_hash_2))
             .sum();
 
         (matches as f64) / (self.hasher_count as f64)
@@ -237,7 +229,7 @@ where
     /// let hashers = min_hash.hashers();
     /// ```
     pub fn hashers(&self) -> &[B; 2] {
-        &self.hasher.hashers()
+        self.hasher.hashers()
     }
 }
 

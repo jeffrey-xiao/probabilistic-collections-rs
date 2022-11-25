@@ -34,7 +34,7 @@ use std::marker::PhantomData;
 /// assert!(hhl.is_empty());
 ///
 /// for key in &[0, 1, 2, 0, 1, 2] {
-///     hhl.insert(&key);
+///     hhl.insert(key);
 /// }
 ///
 /// assert!((hhl.len().round() - 3.0).abs() < EPSILON);
@@ -77,7 +77,7 @@ where
     B: BuildHasher,
 {
     fn get_alpha(p: usize) -> f64 {
-        assert!(4 <= p && p <= 16);
+        assert!((..=16).contains(&p));
         match p {
             4 => 0.673,
             5 => 0.697,
@@ -207,7 +207,7 @@ where
                 let zeros = self
                     .registers
                     .iter()
-                    .map(|value| if *value == 0 { 1 } else { 0 })
+                    .map(|value| u64::from(*value == 0))
                     .sum::<u64>();
                 len * (len / zeros as f64).ln()
             }
@@ -299,7 +299,7 @@ mod tests {
         assert!(hhl.len() < EPSILON);
 
         for key in &[0, 1, 2, 0, 1, 2] {
-            hhl.insert(&key);
+            hhl.insert(key);
         }
 
         assert!(!hhl.is_empty());
@@ -314,13 +314,13 @@ mod tests {
         let mut hhl1 = HyperLogLog::<u32>::with_hasher(0.01, hash_builder_1());
 
         for key in &[0, 1, 2, 0, 1, 2] {
-            hhl1.insert(&key);
+            hhl1.insert(key);
         }
 
         let mut hhl2 = HyperLogLog::<u32>::with_hasher(0.01, *hhl1.hasher());
 
         for key in &[0, 1, 3, 0, 1, 3] {
-            hhl2.insert(&key);
+            hhl2.insert(key);
         }
 
         assert!((hhl1.len().round() - 3.0).abs() < EPSILON);
@@ -335,7 +335,7 @@ mod tests {
     fn test_ser_de() {
         let mut hhl = HyperLogLog::<u32>::new(0.01);
         for key in &[0, 1, 2, 0, 1, 2] {
-            hhl.insert(&key);
+            hhl.insert(key);
         }
 
         let serialized_hhl = bincode::serialize(&hhl).unwrap();

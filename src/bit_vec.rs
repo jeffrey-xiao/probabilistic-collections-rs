@@ -438,8 +438,8 @@ mod tests {
         bv.set(0, true);
         bv.set(1, false);
 
-        assert_eq!(bv[0], true);
-        assert_eq!(bv[1], false);
+        assert!(bv[0]);
+        assert!(!bv[1]);
         assert_eq!(bv.get(2), None);
         assert_eq!(bv.count_ones(), 1);
         assert_eq!(bv.count_zeros(), 1);
