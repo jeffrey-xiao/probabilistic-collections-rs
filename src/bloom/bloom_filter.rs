@@ -381,7 +381,7 @@ where
     /// let hashers = filter.hashers();
     /// ```
     pub fn hashers(&self) -> &[B; 2] {
-        &self.hasher.hashers()
+        self.hasher.hashers()
     }
 }
 
