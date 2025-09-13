@@ -100,13 +100,65 @@ where
     (h1.intersection(&h2).count() as f64) / (h1.union(&h2).count() as f64)
 }
 
+/// Simple iterator that generates n-byte-grams of a single specific width.
+/// Compatible with the `probabilistic_collections::MinHash` API.
+///
+/// # Examples
+///
+/// ```
+/// use probabilistic_collections::similarity::ByteGrams;
+///
+/// let data = b"hello";
+/// let mut grams = ByteGrams::new(data, 2);
+/// assert_eq!(grams.next(), Some(&data[0..2])); // "he"
+/// assert_eq!(grams.next(), Some(&data[1..3])); // "el"
+/// assert_eq!(grams.next(), Some(&data[2..4])); // "ll"
+/// assert_eq!(grams.next(), Some(&data[3..5])); // "lo"
+/// assert_eq!(grams.next(), None);
+/// ```
+pub struct ByteGrams<'a> {
+    data: &'a [u8],
+    width: usize,
+    pos: usize,
+}
+
+impl<'a> ByteGrams<'a> {
+    /// Constructs a new `ByteGrams` iterator over `data` that yields contiguous
+    /// slices of length `width`, sliding by one byte each step.
+    pub fn new(data: &'a [u8], width: usize) -> Self {
+        Self {
+            data,
+            width,
+            pos: 0,
+        }
+    }
+}
+
+impl<'a> Iterator for ByteGrams<'a> {
+    type Item = &'a [u8];
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.pos + self.width <= self.data.len() {
+            let gram = &self.data[self.pos..self.pos + self.width];
+            self.pos += 1;
+            Some(gram)
+        } else {
+            None
+        }
+    }
+}
+
+/// Test helpers for the similarity module (reused across unit tests).
 #[cfg(test)]
 pub mod tests {
-    use super::{get_jaccard_similarity, ShingleIterator};
+    use super::{get_jaccard_similarity, ByteGrams, ShingleIterator};
     use std::f64;
 
+    /// Sample sentence used in similarity tests.
     pub const S1: &str = "the cat sat on a mat";
+    /// Sample sentence used in similarity tests.
     pub const S2: &str = "the cat sat on the mat";
+    /// Sample sentence used in similarity tests.
     pub const S3: &str = "we all scream for ice cream";
 
     #[test]
@@ -122,5 +174,15 @@ pub mod tests {
             ShingleIterator::new(2, S3.split(' ').collect()),
         );
         assert!(f64::abs(similarity - 0.0 / 7.0) < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_byte_grams_iteration() {
+        let data = b"abcd";
+        let mut grams = ByteGrams::new(data, 2);
+        assert_eq!(grams.next(), Some(&data[0..2]));
+        assert_eq!(grams.next(), Some(&data[1..3]));
+        assert_eq!(grams.next(), Some(&data[2..4]));
+        assert_eq!(grams.next(), None);
     }
 }

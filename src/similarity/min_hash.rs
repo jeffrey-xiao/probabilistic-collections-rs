@@ -117,22 +117,83 @@ where
     ///     0.49,
     /// );
     /// ```
-    pub fn get_min_hashes(&self, iter: T) -> Vec<u64>
+    pub fn get_min_hashes(&self, mut iter: T) -> Vec<u64>
     where
         U: Hash,
     {
-        let mut hash_iters = iter
-            .map(|shingle| self.hasher.hash(&shingle))
-            .collect::<Vec<_>>();
-        (0..self.hasher_count)
-            .map(|_| {
-                hash_iters
-                    .iter_mut()
-                    .map(|hash_iter| hash_iter.next().expect("Expected hash"))
-                    .min()
-                    .expect("Expected non-zero `hasher_count` and shingles.")
-            })
-            .collect()
+        if self.hasher_count == 0 {
+            return Vec::new();
+        }
+
+        // If iterator is empty, return sentinel maxima
+        let first = match iter.next() {
+            Some(x) => x,
+            None => return vec![u64::MAX; self.hasher_count],
+        };
+
+        let mut first_hash_iter = self.hasher.hash(&first);
+        let mut mins: Vec<u64> = (0..self.hasher_count)
+            .map(|_| first_hash_iter.next().expect("Expected hash"))
+            .collect();
+
+        for shingle in iter {
+            let mut hash_iter = self.hasher.hash(&shingle);
+            for i in 0..self.hasher_count {
+                let h = hash_iter.next().expect("Expected hash");
+                if h < mins[i] {
+                    mins[i] = h;
+                }
+            }
+        }
+
+        mins
+    }
+
+    /// Returns the minimum hash values and their counts (number of shingles achieving
+    /// the minimum) for each hash index. If there are no shingles and `hasher_count > 0`,
+    /// the minima are set to `u64::MAX` and counts to 0. If `hasher_count == 0`, both
+    /// returned vectors are empty.
+    pub fn get_count_min_sketch(&self, mut iter: T) -> (Vec<u64>, Vec<usize>)
+    where
+        U: Hash,
+    {
+        if self.hasher_count == 0 {
+            return (Vec::new(), Vec::new());
+        }
+
+        // Empty iterator: return sentinel maxima and zero counts
+        let first = match iter.next() {
+            Some(x) => x,
+            None => {
+                return (
+                    vec![u64::MAX; self.hasher_count],
+                    vec![0usize; self.hasher_count],
+                )
+            }
+        };
+
+        // Seed minima and counts from the first shingle
+        let mut first_hash_iter = self.hasher.hash(&first);
+        let mut mins: Vec<u64> = (0..self.hasher_count)
+            .map(|_| first_hash_iter.next().expect("Expected hash"))
+            .collect();
+        let mut counts: Vec<usize> = vec![1; self.hasher_count];
+
+        // Update with subsequent shingles
+        for shingle in iter {
+            let mut hash_iter = self.hasher.hash(&shingle);
+            for i in 0..self.hasher_count {
+                let h = hash_iter.next().expect("Expected hash");
+                if h < mins[i] {
+                    mins[i] = h;
+                    counts[i] = 1;
+                } else if h == mins[i] {
+                    counts[i] = counts[i].saturating_add(1);
+                }
+            }
+        }
+
+        (mins, counts)
     }
 
     /// Returns the estimated Jaccard Similarity measure from the minimum hashes of two iterators.
@@ -237,7 +298,7 @@ where
 mod tests {
     use super::MinHash;
     use crate::similarity::tests::{S1, S2, S3};
-    use crate::similarity::ShingleIterator;
+    use crate::similarity::{get_jaccard_similarity, ByteGrams, ShingleIterator};
     use crate::util::tests::{hash_builder_1, hash_builder_2};
     use std::f64;
 
@@ -290,5 +351,77 @@ mod tests {
 
         assert_eq!(min_hash.hasher_count(), de_min_hash.hasher_count());
         assert_eq!(min_hash.hashers(), de_min_hash.hashers());
+    }
+
+    #[test]
+    fn test_empty_iterator_returns_max_and_zero_counts() {
+        let min_hash = MinHash::with_hashers(5, [hash_builder_1(), hash_builder_2()]);
+
+        let empty: Vec<&str> = Vec::new();
+        let mins = min_hash.get_min_hashes(empty.clone().into_iter());
+        assert_eq!(mins, vec![u64::MAX; 5]);
+
+        let (mins2, counts) = min_hash.get_count_min_sketch(empty.into_iter());
+        assert_eq!(mins2, vec![u64::MAX; 5]);
+        assert_eq!(counts, vec![0usize; 5]);
+    }
+
+    #[test]
+    fn test_zero_hashers_returns_empty_vectors() {
+        let min_hash = MinHash::with_hashers(0, [hash_builder_1(), hash_builder_2()]);
+        let items = vec!["a", "b", "c"]; // non-empty iterator
+        let mins = min_hash.get_min_hashes(items.clone().into_iter());
+        assert!(mins.is_empty());
+        let (mins2, counts2) = min_hash.get_count_min_sketch(items.into_iter());
+        assert!(mins2.is_empty());
+        assert!(counts2.is_empty());
+    }
+
+    #[test]
+    fn test_counts_with_repeated_identical_shingles() {
+        let k = 8;
+        let min_hash = MinHash::with_hashers(k, [hash_builder_1(), hash_builder_2()]);
+
+        // Single item establishes baseline minima and counts of 1
+        let (mins_single, counts_single) = min_hash.get_count_min_sketch(vec!["x"].into_iter());
+        assert_eq!(counts_single, vec![1usize; k]);
+
+        // Repeating the same item N times should keep the same minima and increase counts to N
+        let n: usize = 3;
+        let (mins_repeated, counts_repeated) =
+            min_hash.get_count_min_sketch(vec!["x", "x", "x"].into_iter());
+        assert_eq!(mins_repeated, mins_single);
+        assert_eq!(counts_repeated, vec![n; k]);
+
+        // Mixing in different items should not reduce counts below 1 and should
+        // preserve minima if the repeated item already yields minima.
+        let (mins_mixed, counts_mixed) =
+            min_hash.get_count_min_sketch(vec!["x", "y", "x", "z", "x"].into_iter());
+        assert!(mins_mixed
+            .iter()
+            .zip(mins_single.iter())
+            .all(|(a, b)| *a <= *b));
+        assert!(counts_mixed.iter().all(|&c| c >= 1));
+    }
+
+    #[test]
+    fn test_min_hash_with_byte_grams_approximates_jaccard() {
+        let data1 = S1.as_bytes();
+        let data2 = S2.as_bytes();
+        let width = 3;
+
+        let exact = get_jaccard_similarity(
+            ByteGrams::new(data1, width),
+            ByteGrams::new(data2, width),
+        );
+
+        let min_hash = MinHash::with_hashers(256, [hash_builder_1(), hash_builder_2()]);
+        let approx = min_hash.get_similarity(
+            ByteGrams::new(data1, width),
+            ByteGrams::new(data2, width),
+        );
+
+        // Allow some tolerance due to probabilistic estimation; 0.1 should be safe for 256 hashes.
+        assert!((approx - exact).abs() <= 0.1, "approx={} exact={}", approx, exact);
     }
 }
